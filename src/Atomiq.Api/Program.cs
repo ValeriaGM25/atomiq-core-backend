@@ -1,3 +1,5 @@
+using Atomiq.Application.Profiles;
+using Atomiq.Application.Reactions;
 using Atomiq.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -19,6 +21,12 @@ builder.Services.AddCors(options =>
 });
 builder.Services.AddSignalR();
 builder.Services.AddAtomiqInfrastructure(builder.Configuration);
+builder.Services.AddScoped<GetOrCreateProfileUseCase>();
+builder.Services.AddScoped<GetProfileUseCase>();
+builder.Services.AddScoped<AddXpUseCase>();
+builder.Services.AddScoped<GetDiscoveredReactionsUseCase>();
+builder.Services.AddScoped<SaveReactionLogUseCase>();
+builder.Services.AddScoped<GetReactionHistoryUseCase>();
 
 var app = builder.Build();
 

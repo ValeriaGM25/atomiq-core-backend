@@ -1,4 +1,6 @@
+using Atomiq.Application.Abstractions;
 using Atomiq.Infrastructure.Configuration;
+using Atomiq.Infrastructure.Mongo;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -10,8 +12,17 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        services.Configure<MongoSettings>(configuration.GetSection(MongoSettings.SectionName));
+        services.AddOptions<MongoSettings>()
+            .Bind(configuration.GetSection(MongoSettings.SectionName))
+            .Validate(settings => !string.IsNullOrWhiteSpace(settings.DatabaseName),
+                "Mongo:DatabaseName must be configured.")
+            .ValidateOnStart();
         services.Configure<GeminiSettings>(configuration.GetSection(GeminiSettings.SectionName));
+
+        services.AddSingleton<MongoDbContext>();
+        services.AddSingleton<MongoIndexInitializer>();
+        services.AddSingleton<IUserRepository, MongoUserRepository>();
+        services.AddSingleton<IReactionHistoryRepository, MongoReactionHistoryRepository>();
 
         return services;
     }

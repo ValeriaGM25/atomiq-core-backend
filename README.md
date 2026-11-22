@@ -10,7 +10,7 @@ Atomiq es un laboratorio inmersivo de dinámica molecular y reacciones químicas
 - xUnit y `WebApplicationFactory`
 - Puntos de extensión preparados para SignalR, MongoDB y Gemini
 
-Esta fase no implementa lógica de Gemini, SignalR, MongoDB ni gamificación.
+Gemini, SignalR y el motor químico de Unity siguen fuera del alcance de esta fase.
 
 ## Requisitos
 
@@ -24,6 +24,8 @@ Esta fase no implementa lógica de Gemini, SignalR, MongoDB ni gamificación.
 - `Atomiq.Application`: casos de uso y puertos de aplicación; depende de Domain.
 - `Atomiq.Infrastructure`: adaptadores técnicos y configuración; depende de Application y Domain.
 - `Atomiq.Api`: composición HTTP, middleware, DI y endpoints; depende de Application e Infrastructure.
+
+El dominio contiene `UserProfile` y `ReactionLog`. Application expone casos de uso para perfiles, XP e historial. MongoDB se mantiene en Infrastructure mediante documentos BSON separados de las entidades.
 
 La validación científica y la simulación química corresponden al cliente Unity Android/ARCore, no a este backend.
 
@@ -49,6 +51,15 @@ El endpoint inicial es `GET /health`. Los endpoints de negocio no se crean como 
 ## Configuración local
 
 La configuración de ejemplo se encuentra en `src/Atomiq.Api/appsettings.json`. Los valores sensibles deben proporcionarse mediante User Secrets o variables de entorno, nunca mediante Git.
+
+MongoDB utiliza las colecciones `profiles` y `reaction_logs`. La cadena de conexión no se versiona:
+
+```bash
+dotnet user-secrets set "Mongo:ConnectionString" "mongodb://localhost:27017" --project src/Atomiq.Api
+dotnet user-secrets set "Mongo:DatabaseName" "atomiq_local" --project src/Atomiq.Api
+```
+
+La creación de índices se expone mediante `MongoIndexInitializer` y no se ejecuta automáticamente al iniciar la API.
 
 ```bash
 dotnet user-secrets init --project src/Atomiq.Api
