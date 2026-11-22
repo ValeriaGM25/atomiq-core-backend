@@ -11,7 +11,8 @@ public sealed record ExplainReactionRequest(
     double? DeltaEnthalpyKjMol,
     int ElectronsTransferred,
     string? ThermodynamicClassification,
-    long TimestampUnixMs);
+    long TimestampUnixMs,
+    string? EventId = null);
 
 public sealed record ExplainReactionResponse(
     string Explanation,

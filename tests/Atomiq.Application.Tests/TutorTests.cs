@@ -43,6 +43,22 @@ public sealed class TutorTests
     }
 
     [Fact]
+    public async Task SameExplanationAtAnotherExecutionTimeHitsCache()
+    {
+        var client = new FakeGeminiClient("Explicación breve.");
+        var cache = new FakeExplanationCache();
+        var service = new AiTutorService(client, cache, CreateConfiguration(enabled: true));
+
+        await service.ExplainReactionAsync(CreateInput());
+        await service.ExplainReactionAsync(CreateInput() with
+        {
+            Timestamp = DateTimeOffset.FromUnixTimeMilliseconds(1732068001000)
+        });
+
+        Assert.Equal(1, client.CallCount);
+    }
+
+    [Fact]
     public async Task MissingProviderFallsBackWithoutClaimingGemini()
     {
         var client = new FakeGeminiClient(null);

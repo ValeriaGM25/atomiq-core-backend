@@ -84,6 +84,8 @@ X-Atomiq-Device-Token: <token-provisionado>
 
 El historial se consulta con `GET /api/reactions/history?page=1&pageSize=20`. El dispositivo se obtiene de la identidad autenticada y no de un parámetro arbitrario.
 
+El tutor también está disponible en `/hubs/aitutor` mediante SignalR. El contrato y los requisitos del cliente Unity están documentados en [docs/unity-signalr-integration.md](docs/unity-signalr-integration.md). REST permanece disponible como fallback.
+
 ## Tutor pedagógico
 
 `POST /api/reactions/explain` requiere el mismo token del dispositivo y acepta el payload de simulación Unity. Devuelve siempre una explicación breve en español, junto con `source`, que puede ser `GeminiOnline`, `MemoryCache` u `OfflineFallback`.

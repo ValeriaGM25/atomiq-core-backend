@@ -13,7 +13,7 @@ Estos contratos son una referencia inicial para la integración con Unity. Todav
 - Evento: `ReceiveTutorExplanation`
 - HTTP: `POST /api/reactions/explain`
 
-El endpoint HTTP está implementado; SignalR sigue sin implementarse.
+El endpoint HTTP y el Hub SignalR están implementados. La compatibilidad end-to-end con Unity aún debe verificarse con el cliente real.
 
 Payload compatible con Unity:
 
@@ -29,7 +29,8 @@ Payload compatible con Unity:
   "deltaEnthalpyKjMol": -411.2,
   "electronsTransferred": 1,
   "thermodynamicClassification": "Exotérmica",
-  "timestampUnixMs": 1732068000000
+  "timestampUnixMs": 1732068000000,
+  "eventId": "unity-event-001"
 }
 ```
 
@@ -43,7 +44,7 @@ Respuesta mínima compatible:
 }
 ```
 
-`source` y `historyDuplicate` son extensiones de observabilidad. La entalpía, ecuación y validez son datos declarados por Unity; el ejemplo no afirma que la entalpía corresponda exactamente al proceso visualizado. El backend no implementa un validador químico centralizado.
+`source`, `historyDuplicate` y `eventId` son extensiones opcionales. La entalpía, ecuación y validez son datos declarados por Unity; el ejemplo no afirma que la entalpía corresponda exactamente al proceso visualizado. El backend no implementa un validador químico centralizado.
 
 La explicación se limita a 25 palabras. Gemini recibe una instrucción de sistema controlada por el backend y el payload se marca como dato no confiable; ningún campo textual de Unity puede modificar las instrucciones internas.
 
@@ -53,7 +54,7 @@ La explicación se limita a 25 palabras. Gemini recibe una instrucción de siste
 - `POST /api/profile/xp`
 - `GET /api/reactions/history?page=1&pageSize=20`
 
-Los endpoints de perfil, XP, historial y explicación HTTP están implementados. SignalR sigue siendo un contrato previsto y no está expuesto.
+Los endpoints de perfil, XP, historial y explicación HTTP están implementados. SignalR está expuesto en `/hubs/aitutor` con el contrato descrito en [docs/unity-signalr-integration.md](unity-signalr-integration.md).
 
 ## Autenticación y autorización
 

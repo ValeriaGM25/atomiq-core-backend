@@ -50,3 +50,9 @@ Los endpoints no exponen el identificador interno del perfil. La validación HTT
 ## Consistencia e idempotencia
 
 La actualización de XP es atómica dentro del documento de perfil mediante un filtro por `EventId`, límite de `int.MaxValue` y `$inc`/`$addToSet`. El historial usa un índice único sobre `EventId`. La escritura de historial y la actualización de XP son operaciones separadas; sin una transacción MongoDB soportada no se afirma atomicidad entre ambas. Los reintentos son seguros por separado y el riesgo de una caída entre operaciones queda pendiente para una futura estrategia transaccional o de reconciliación.
+
+## SignalR y Unity
+
+`AITutorHub` es transitorio y no conserva estado mutable de sesión. Usa el mismo `ExplainReactionUseCase` que REST, por lo que mantiene las mismas validaciones, caché, fallback, autenticación e idempotencia. El Hub exige autorización, limita mensajes a 64 KiB y aplica el rate limiting existente.
+
+La caché identifica la explicación por contenido científico y contexto pedagógico, no por el timestamp de ejecución. `EventId` identifica la operación de historial; puede llegar opcionalmente desde Unity o conservar la generación determinista anterior.

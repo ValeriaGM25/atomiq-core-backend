@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Atomiq.Api.Contracts;
+using Atomiq.Api.Hubs;
 using Atomiq.Application.Validation;
 using Atomiq.Application.Profiles;
 using Atomiq.Application.Reactions;
@@ -26,7 +27,11 @@ builder.Services.AddCors(options =>
         }
     });
 });
-builder.Services.AddSignalR();
+builder.Services.AddSignalR(options =>
+{
+    options.MaximumReceiveMessageSize = 64 * 1024;
+    options.EnableDetailedErrors = false;
+});
 builder.Services.AddAtomiqInfrastructure(builder.Configuration);
 builder.Services.AddScoped<GetOrCreateProfileUseCase>();
 builder.Services.AddScoped<GetProfileUseCase>();
@@ -89,6 +94,10 @@ app.MapGet("/health", () => Results.Ok(new
     status = "ok",
     timestampUtc = DateTimeOffset.UtcNow
 }));
+
+app.MapHub<AITutorHub>("/hubs/aitutor")
+    .RequireAuthorization()
+    .RequireRateLimiting("mobile-api");
 
 var protectedApi = app.MapGroup("/api")
     .RequireAuthorization()
@@ -212,7 +221,19 @@ protectedApi.MapPost("/reactions/explain", async (
             title: "The authenticated device is not valid.");
     }
 
-    var result = await useCase.ExecuteAsync(deviceId!, input!, cancellationToken);
+    if (request!.EventId is not null && !InputValidation.IsValidEventId(request.EventId))
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["eventId"] = ["The eventId format or length is invalid."]
+        });
+    }
+
+    var result = await useCase.ExecuteAsync(
+        deviceId!,
+        input!,
+        request.EventId,
+        cancellationToken);
     return Results.Ok(new ExplainReactionResponse(
         result.Explanation,
         result.Source,

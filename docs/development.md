@@ -49,6 +49,12 @@ Sin API key o con Gemini desactivado, `POST /api/reactions/explain` usa explicac
 
 Las pruebas usan `HttpMessageHandler` simulado y no realizan llamadas reales a Gemini. La experiencia AR local no depende de la disponibilidad del backend o del proveedor.
 
+## SignalR
+
+El Hub se expone en `/hubs/aitutor` y requiere `X-Atomiq-Device-Token`. El cliente SignalR debe gestionar la negociación, handshake JSON, framing `0x1E`, pings y reconexión; no se deben enviar mensajes WebSocket manuales desde la aplicación.
+
+Las pruebas incluyen cliente SignalR con Long Polling y una prueba de handshake/invocación WebSocket contra `TestServer`. No sustituyen una prueba con Unity Android/ARCore. Si el cliente Unity no permite headers personalizados durante la negociación o WebSocket, debe confirmarse una alternativa basada en el mecanismo oficial de access token antes de cambiar el contrato.
+
 ## Pruebas
 
 Las pruebas unitarias, de casos de uso y de serialización BSON no requieren MongoDB. La integración real con MongoDB queda pendiente de un contenedor de desarrollo; Docker no está disponible en el entorno actual, por lo que no se ejecutan pruebas contra Atlas ni producción.
