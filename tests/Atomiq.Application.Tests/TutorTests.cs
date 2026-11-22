@@ -4,7 +4,7 @@ using System.Text.Json;
 using Atomiq.Application.Tutor;
 using Atomiq.Domain;
 using Atomiq.Infrastructure.Configuration;
-using Atomiq.Infrastructure.Gemini;
+using Atomiq.Infrastructure.OpenAi;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -13,9 +13,9 @@ namespace Atomiq.Application.Tests;
 public sealed class TutorTests
 {
     [Fact]
-    public async Task GeminiExplanationIsCachedAndLimitedToTwentyFiveWords()
+    public async Task OpenAiExplanationIsCachedAndLimitedToTwentyFiveWords()
     {
-        var client = new FakeGeminiClient("Una explicación pedagógica breve con datos proporcionados por Unity.");
+        var client = new FakeOpenAiClient("Una explicación pedagógica breve con datos proporcionados por Unity.");
         var cache = new FakeExplanationCache();
         var service = new AiTutorService(client, cache, CreateConfiguration(enabled: true));
         var input = CreateInput();
@@ -23,7 +23,7 @@ public sealed class TutorTests
         var first = await service.ExplainReactionAsync(input);
         var second = await service.ExplainReactionAsync(input);
 
-        Assert.Equal("GeminiOnline", first.Source);
+        Assert.Equal("OpenAIOnline", first.Source);
         Assert.Equal("MemoryCache", second.Source);
         Assert.Equal(1, client.CallCount);
         Assert.InRange(first.Explanation.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length, 1, 25);
@@ -32,7 +32,7 @@ public sealed class TutorTests
     [Fact]
     public async Task DifferentScientificResultsUseDifferentCacheKeys()
     {
-        var client = new FakeGeminiClient("Explicación breve.");
+        var client = new FakeOpenAiClient("Explicación breve.");
         var cache = new FakeExplanationCache();
         var service = new AiTutorService(client, cache, CreateConfiguration(enabled: true));
 
@@ -45,7 +45,7 @@ public sealed class TutorTests
     [Fact]
     public async Task SameExplanationAtAnotherExecutionTimeHitsCache()
     {
-        var client = new FakeGeminiClient("Explicación breve.");
+        var client = new FakeOpenAiClient("Explicación breve.");
         var cache = new FakeExplanationCache();
         var service = new AiTutorService(client, cache, CreateConfiguration(enabled: true));
 
@@ -59,15 +59,15 @@ public sealed class TutorTests
     }
 
     [Fact]
-    public async Task MissingProviderFallsBackWithoutClaimingGemini()
+    public async Task MissingProviderFallsBackWithoutClaimingOpenAi()
     {
-        var client = new FakeGeminiClient(null);
+        var client = new FakeOpenAiClient(null);
         var service = new AiTutorService(client, new FakeExplanationCache(), CreateConfiguration(enabled: true));
 
         var result = await service.ExplainReactionAsync(CreateInput());
 
         Assert.Equal("OfflineFallback", result.Source);
-        Assert.DoesNotContain("Gemini", result.Explanation, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("OpenAI", result.Explanation, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -75,7 +75,7 @@ public sealed class TutorTests
     {
         var tooLong = string.Join(' ', Enumerable.Repeat("palabra", 26));
         var service = new AiTutorService(
-            new FakeGeminiClient(tooLong),
+            new FakeOpenAiClient(tooLong),
             new FakeExplanationCache(),
             CreateConfiguration(enabled: true));
 
@@ -87,7 +87,7 @@ public sealed class TutorTests
     [Fact]
     public async Task DisabledProviderUsesFallback()
     {
-        var client = new FakeGeminiClient("Nunca debe usarse.");
+        var client = new FakeOpenAiClient("Nunca debe usarse.");
         var service = new AiTutorService(client, new FakeExplanationCache(), CreateConfiguration(enabled: false));
 
         var result = await service.ExplainReactionAsync(CreateInput());
@@ -97,19 +97,19 @@ public sealed class TutorTests
     }
 
     [Fact]
-    public async Task GeminiClientParsesValidResponseThroughMockedHandler()
+    public async Task OpenAiClientParsesValidResponsesApiThroughMockedHandler()
     {
         var handler = new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
         {
             Content = JsonContent.Create(new
             {
-                candidates = new[]
+                output = new[]
                 {
-                    new { content = new { parts = new[] { new { text = "Explicación remota breve." } } } }
+                    new { content = new[] { new { type = "output_text", text = "Explicación remota breve." } } }
                 }
             })
         });
-        var settings = Options.Create(new GeminiSettings
+        var settings = Options.Create(new OpenAiSettings
         {
             Enabled = true,
             BaseUrl = "https://example.invalid",
@@ -118,25 +118,31 @@ public sealed class TutorTests
             TimeoutMilliseconds = 1000,
             MaxOutputWords = 25
         });
-        var client = new GeminiClient(new HttpClient(handler), settings, NullLogger<GeminiClient>.Instance);
+        var client = new OpenAiClient(new HttpClient(handler), settings, NullLogger<OpenAiClient>.Instance);
 
         var result = await client.GenerateExplanationAsync(CreateInput(), "backend system instruction");
 
         Assert.True(result.Succeeded);
         Assert.Equal("Explicación remota breve.", result.Text);
-        Assert.Equal("x-goog-api-key", handler.Request!.Headers.First(header =>
-            header.Key.Equals("x-goog-api-key", StringComparison.OrdinalIgnoreCase)).Key);
+        Assert.Equal(HttpMethod.Post, handler.Request!.Method);
+        Assert.EndsWith("/v1/responses", handler.Request.RequestUri!.ToString(), StringComparison.Ordinal);
+        Assert.Equal("Bearer", handler.Request.Headers.Authorization!.Scheme);
+        Assert.Equal("test-only-key", handler.Request.Headers.Authorization.Parameter);
+        using var requestDocument = JsonDocument.Parse(handler.RequestBody!);
+        Assert.Equal("test-model", requestDocument.RootElement.GetProperty("model").GetString());
+        Assert.Equal("backend system instruction", requestDocument.RootElement.GetProperty("instructions").GetString());
+        Assert.Contains("Na", requestDocument.RootElement.GetProperty("input").GetString()!, StringComparison.Ordinal);
     }
 
     [Theory]
     [InlineData(HttpStatusCode.TooManyRequests)]
     [InlineData(HttpStatusCode.InternalServerError)]
-    public async Task GeminiTransientHttpErrorsUseUnavailableResult(HttpStatusCode statusCode)
+    public async Task OpenAiTransientHttpErrorsUseUnavailableResult(HttpStatusCode statusCode)
     {
         var handler = new StubHttpMessageHandler(_ => new HttpResponseMessage(statusCode));
-        var client = new GeminiClient(
+        var client = new OpenAiClient(
             new HttpClient(handler),
-            Options.Create(new GeminiSettings
+            Options.Create(new OpenAiSettings
             {
                 Enabled = true,
                 BaseUrl = "https://example.invalid",
@@ -144,7 +150,7 @@ public sealed class TutorTests
                 ApiKey = "test-only-key",
                 TimeoutMilliseconds = 1000
             }),
-            NullLogger<GeminiClient>.Instance);
+            NullLogger<OpenAiClient>.Instance);
 
         var result = await client.GenerateExplanationAsync(CreateInput(), "system");
 
@@ -152,15 +158,15 @@ public sealed class TutorTests
     }
 
     [Fact]
-    public async Task GeminiMalformedJsonUsesUnavailableResult()
+    public async Task OpenAiMalformedJsonUsesUnavailableResult()
     {
         var handler = new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
         {
             Content = new StringContent("{ malformed")
         });
-        var client = new GeminiClient(
+        var client = new OpenAiClient(
             new HttpClient(handler),
-            Options.Create(new GeminiSettings
+            Options.Create(new OpenAiSettings
             {
                 Enabled = true,
                 BaseUrl = "https://example.invalid",
@@ -168,7 +174,75 @@ public sealed class TutorTests
                 ApiKey = "test-only-key",
                 TimeoutMilliseconds = 1000
             }),
-            NullLogger<GeminiClient>.Instance);
+            NullLogger<OpenAiClient>.Instance);
+
+        var result = await client.GenerateExplanationAsync(CreateInput(), "system");
+
+        Assert.False(result.Succeeded);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized)]
+    [InlineData(HttpStatusCode.Forbidden)]
+    public async Task OpenAiAuthenticationErrorsUseUnavailableResult(HttpStatusCode statusCode)
+    {
+        var handler = new StubHttpMessageHandler(_ => new HttpResponseMessage(statusCode));
+        var client = new OpenAiClient(
+            new HttpClient(handler),
+            Options.Create(new OpenAiSettings
+            {
+                Enabled = true,
+                BaseUrl = "https://example.invalid",
+                Model = "gpt-4o",
+                ApiKey = "test-only-key",
+                TimeoutMilliseconds = 1000
+            }),
+            NullLogger<OpenAiClient>.Instance);
+
+        var result = await client.GenerateExplanationAsync(CreateInput(), "system");
+
+        Assert.False(result.Succeeded);
+    }
+
+    [Fact]
+    public async Task OpenAiUnexpectedResponseUsesUnavailableResult()
+    {
+        var handler = new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = JsonContent.Create(new { output = Array.Empty<object>() })
+        });
+        var client = new OpenAiClient(
+            new HttpClient(handler),
+            Options.Create(new OpenAiSettings
+            {
+                Enabled = true,
+                BaseUrl = "https://example.invalid",
+                Model = "gpt-4o",
+                ApiKey = "test-only-key",
+                TimeoutMilliseconds = 1000
+            }),
+            NullLogger<OpenAiClient>.Instance);
+
+        var result = await client.GenerateExplanationAsync(CreateInput(), "system");
+
+        Assert.False(result.Succeeded);
+    }
+
+    [Fact]
+    public async Task OpenAiTimeoutUsesUnavailableResult()
+    {
+        var handler = new StubHttpMessageHandler(_ => throw new TaskCanceledException("simulated timeout"));
+        var client = new OpenAiClient(
+            new HttpClient(handler),
+            Options.Create(new OpenAiSettings
+            {
+                Enabled = true,
+                BaseUrl = "https://example.invalid",
+                Model = "gpt-4o",
+                ApiKey = "test-only-key",
+                TimeoutMilliseconds = 1000
+            }),
+            NullLogger<OpenAiClient>.Instance);
 
         var result = await client.GenerateExplanationAsync(CreateInput(), "system");
 
@@ -181,7 +255,7 @@ public sealed class TutorTests
         using var source = new CancellationTokenSource();
         source.Cancel();
         var service = new AiTutorService(
-            new FakeGeminiClient("unused"),
+            new FakeOpenAiClient("unused"),
             new FakeExplanationCache(),
             CreateConfiguration(enabled: true));
 
@@ -212,11 +286,11 @@ public sealed class TutorTests
         "Exotérmica",
         DateTimeOffset.FromUnixTimeMilliseconds(1732068000000));
 
-    private sealed class FakeGeminiClient(string? text) : IGeminiClient
+    private sealed class FakeOpenAiClient(string? text) : IOpenAiClient
     {
         public int CallCount { get; private set; }
 
-        public Task<GeminiClientResult> GenerateExplanationAsync(
+        public Task<OpenAiClientResult> GenerateExplanationAsync(
             ReactionExplanationInput input,
             string systemInstruction,
             CancellationToken cancellationToken = default)
@@ -224,8 +298,8 @@ public sealed class TutorTests
             cancellationToken.ThrowIfCancellationRequested();
             CallCount++;
             return Task.FromResult(text is null
-                ? GeminiClientResult.Unavailable()
-                : GeminiClientResult.Success(text));
+                ? OpenAiClientResult.Unavailable()
+                : OpenAiClientResult.Success(text));
         }
     }
 
@@ -248,13 +322,17 @@ public sealed class TutorTests
         Func<HttpRequestMessage, HttpResponseMessage> responseFactory) : HttpMessageHandler
     {
         public HttpRequestMessage? Request { get; private set; }
+        public string? RequestBody { get; private set; }
 
-        protected override Task<HttpResponseMessage> SendAsync(
+        protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
             Request = request;
-            return Task.FromResult(responseFactory(request));
+            RequestBody = request.Content is null
+                ? null
+                : await request.Content.ReadAsStringAsync(cancellationToken);
+            return responseFactory(request);
         }
     }
 }

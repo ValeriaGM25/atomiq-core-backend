@@ -8,7 +8,7 @@ Atomiq es un laboratorio inmersivo de dinámica molecular y reacciones químicas
 - C# con nullable reference types y analyzers habilitados
 - Clean Architecture
 - xUnit y `WebApplicationFactory`
-- Gateway configurable para Gemini, MongoDB y puntos de extensión de SignalR
+- Gateway configurable para OpenAI, MongoDB y puntos de extensión de SignalR
 
 SignalR y el motor químico de Unity siguen fuera del alcance de esta fase.
 
@@ -46,7 +46,7 @@ dotnet test --no-build
 dotnet run --project src/Atomiq.Api
 ```
 
-El endpoint inicial es `GET /health`. Los contratos de Gemini y SignalR no se crean como placeholders exitosos.
+El endpoint inicial es `GET /health`. Los contratos de OpenAI y SignalR no se crean como placeholders exitosos.
 
 ## API de perfil y reacciones
 
@@ -88,9 +88,9 @@ El tutor también está disponible en `/hubs/aitutor` mediante SignalR. El contr
 
 ## Tutor pedagógico
 
-`POST /api/reactions/explain` requiere el mismo token del dispositivo y acepta el payload de simulación Unity. Devuelve siempre una explicación breve en español, junto con `source`, que puede ser `GeminiOnline`, `MemoryCache` u `OfflineFallback`.
+`POST /api/reactions/explain` requiere el mismo token del dispositivo y acepta el payload de simulación Unity. Devuelve siempre una explicación breve en español, junto con `source`, que puede ser `OpenAIOnline`, `MemoryCache` u `OfflineFallback`.
 
-Gemini está desactivado por defecto. Cuando está desactivado, no se realiza ninguna llamada externa y se utiliza el fallback local. El backend no recalcula la química ni transforma los datos de Unity en instrucciones para el modelo.
+OpenAI está desactivado por defecto. Cuando está desactivado, no se realiza ninguna llamada externa y se utiliza el fallback local. El backend no recalcula la química ni transforma los datos de Unity en instrucciones para el modelo.
 
 La caché en memoria usa una clave derivada de todos los campos científicos, resultado, idioma, versión del prompt, modelo y política de activación. Su TTL predeterminado es de 24 horas y el tamaño está limitado.
 
@@ -111,12 +111,12 @@ Los tokens del stand también deben configurarse fuera del repositorio. Nunca de
 
 ```bash
 dotnet user-secrets init --project src/Atomiq.Api
-dotnet user-secrets set "Gemini:ApiKey" "valor-local" --project src/Atomiq.Api
-dotnet user-secrets set "Gemini:Enabled" "true" --project src/Atomiq.Api
-dotnet user-secrets set "Gemini:Model" "gemini-3.5-flash-lite" --project src/Atomiq.Api
+dotnet user-secrets set "OpenAI:ApiKey" "valor-local-no-versionado" --project src/Atomiq.Api
+dotnet user-secrets set "OpenAI:Enabled" "true" --project src/Atomiq.Api
+dotnet user-secrets set "OpenAI:Model" "gpt-4o" --project src/Atomiq.Api
 ```
 
-`gemini-3.5-flash-lite` es un candidato configurable sujeto a disponibilidad y compatibilidad de la cuenta; debe verificarse antes de activar el proveedor. `Gemini:BaseUrl`, timeout, límite de palabras, TTL y versión del prompt también son configurables. No se ejecutaron llamadas reales durante esta fase.
+`gpt-4o` es el modelo predeterminado y puede cambiarse mediante `OpenAI:Model`. `OpenAI:BaseUrl`, timeout, límite de palabras, TTL y versión del prompt también son configurables. Las pruebas usan HTTP simulado y no ejecutan llamadas reales de pago.
 
 ## Contratos Unity
 

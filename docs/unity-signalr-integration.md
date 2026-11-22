@@ -67,13 +67,13 @@ El cliente Unity debe confirmar que su implementación permite headers personali
 
 Se utiliza el protocolo JSON oficial de SignalR. El cliente SignalR gestiona handshake, `invocationId`, separador de registros `0x1E`, ping, cierre y reconexión. La aplicación no construye un protocolo WebSocket propio.
 
-El servidor limita el mensaje recibido a 64 KiB y aplica rate limiting por identidad. La duración de la llamada al proveedor Gemini usa el timeout configurado existente.
+El servidor limita el mensaje recibido a 64 KiB y aplica rate limiting por identidad. La duración de la llamada al proveedor OpenAI usa el timeout configurado existente.
 
 ## Fallback REST
 
 `POST /api/reactions/explain` permanece disponible para clientes que no puedan usar SignalR. Ambos caminos reutilizan `ExplainReactionUseCase`, `IAiTutorService`, caché, fallback y persistencia idempotente.
 
-La experiencia AR local debe continuar aunque el Hub, MongoDB o Gemini no estén disponibles. En ese caso la explicación puede proceder de `OfflineFallback` o la operación puede informar un fallo de persistencia sin ocultarlo.
+La experiencia AR local debe continuar aunque el Hub, MongoDB u OpenAI no estén disponibles. En ese caso la explicación puede proceder de `OfflineFallback` o la operación puede informar un fallo de persistencia sin ocultarlo.
 
 ## Pendiente con Unity
 
