@@ -55,11 +55,11 @@ public sealed class ApplicationUseCaseTests
 
         var first = await useCase.ExecuteAsync(reaction);
         var second = await useCase.ExecuteAsync(reaction);
-        var history = await new GetReactionHistoryUseCase(repository).ExecuteAsync("device-1");
+        var history = await new GetReactionHistoryUseCase(repository).ExecutePageAsync("device-1", 1, 20);
 
         Assert.True(first.Inserted);
         Assert.True(second.DuplicateEvent);
-        Assert.Single(history);
+        Assert.Single(history.Items);
     }
 
     [Fact]
@@ -147,8 +147,10 @@ public sealed class ApplicationUseCaseTests
             return Task.FromResult(reactions.TryAdd(reaction.EventId, reaction) ? reaction : null);
         }
 
-        public Task<IReadOnlyList<ReactionLog>> GetByDeviceIdAsync(
+        public Task<ReactionHistoryPage> GetPageByDeviceIdAsync(
             string deviceId,
+            int skip,
+            int take,
             DateTimeOffset? from = null,
             DateTimeOffset? toInclusive = null,
             CancellationToken cancellationToken = default)
@@ -158,8 +160,12 @@ public sealed class ApplicationUseCaseTests
                 .Where(reaction => reaction.DeviceId == deviceId)
                 .Where(reaction => from is null || reaction.Timestamp >= from.Value)
                 .Where(reaction => toInclusive is null || reaction.Timestamp <= toInclusive.Value)
+                .OrderByDescending(reaction => reaction.Timestamp)
+                .Skip(skip)
+                .Take(take + 1)
                 .ToArray();
-            return Task.FromResult<IReadOnlyList<ReactionLog>>(result);
+            var hasNextPage = result.Length > take;
+            return Task.FromResult(new ReactionHistoryPage(result.Take(take).ToArray(), hasNextPage));
         }
     }
 }

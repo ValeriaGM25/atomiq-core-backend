@@ -21,3 +21,9 @@ public sealed record ReactionLogDto(
     DateTimeOffset Timestamp);
 
 public sealed record SaveReactionResult(ReactionLogDto Reaction, bool Inserted, bool DuplicateEvent);
+
+public sealed record ReactionHistoryPageDto(
+    IReadOnlyList<ReactionLogDto> Items,
+    int Page,
+    int PageSize,
+    bool HasNextPage);

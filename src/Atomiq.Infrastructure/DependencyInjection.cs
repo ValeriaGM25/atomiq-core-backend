@@ -1,6 +1,8 @@
 using Atomiq.Application.Abstractions;
 using Atomiq.Infrastructure.Configuration;
 using Atomiq.Infrastructure.Mongo;
+using Atomiq.Infrastructure.Security;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -18,6 +20,14 @@ public static class DependencyInjection
                 "Mongo:DatabaseName must be configured.")
             .ValidateOnStart();
         services.Configure<GeminiSettings>(configuration.GetSection(GeminiSettings.SectionName));
+        services.AddOptions<StandTokenOptions>()
+            .Bind(configuration.GetSection(StandTokenOptions.SectionName));
+
+        services.AddAuthentication(StandTokenAuthenticationHandler.SchemeName)
+            .AddScheme<AuthenticationSchemeOptions, StandTokenAuthenticationHandler>(
+                StandTokenAuthenticationHandler.SchemeName,
+                _ => { });
+        services.AddAuthorization();
 
         services.AddSingleton<MongoDbContext>();
         services.AddSingleton<MongoIndexInitializer>();

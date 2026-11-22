@@ -25,8 +25,10 @@ public sealed class MongoReactionHistoryRepository(MongoDbContext context) : IRe
         }
     }
 
-    public async Task<IReadOnlyList<ReactionLog>> GetByDeviceIdAsync(
+    public async Task<ReactionHistoryPage> GetPageByDeviceIdAsync(
         string deviceId,
+        int skip,
+        int take,
         DateTimeOffset? from = null,
         DateTimeOffset? toInclusive = null,
         CancellationToken cancellationToken = default)
@@ -34,6 +36,11 @@ public sealed class MongoReactionHistoryRepository(MongoDbContext context) : IRe
         if (string.IsNullOrWhiteSpace(deviceId))
         {
             throw new DomainException("deviceId is required.");
+        }
+
+        if (skip < 0 || take is < 1 or > 100)
+        {
+            throw new DomainException("History pagination limits are invalid.");
         }
 
         var filterBuilder = Builders<ReactionLogDocument>.Filter;
@@ -51,8 +58,16 @@ public sealed class MongoReactionHistoryRepository(MongoDbContext context) : IRe
         var documents = await context.ReactionLogs
             .Find(filter)
             .SortByDescending(reaction => reaction.Timestamp)
+            .Skip(skip)
+            .Limit(take + 1)
             .ToListAsync(cancellationToken);
 
-        return documents.Select(MongoMappings.ToDomain).ToArray();
+        var hasNextPage = documents.Count > take;
+        var items = documents
+            .Take(take)
+            .Select(MongoMappings.ToDomain)
+            .ToArray();
+
+        return new ReactionHistoryPage(items, hasNextPage);
     }
 }

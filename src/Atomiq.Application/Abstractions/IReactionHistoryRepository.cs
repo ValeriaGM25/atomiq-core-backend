@@ -8,9 +8,13 @@ public interface IReactionHistoryRepository
         ReactionLog reaction,
         CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<ReactionLog>> GetByDeviceIdAsync(
+    Task<ReactionHistoryPage> GetPageByDeviceIdAsync(
         string deviceId,
+        int skip,
+        int take,
         DateTimeOffset? from = null,
         DateTimeOffset? toInclusive = null,
         CancellationToken cancellationToken = default);
 }
+
+public sealed record ReactionHistoryPage(IReadOnlyList<ReactionLog> Items, bool HasNextPage);

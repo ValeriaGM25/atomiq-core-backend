@@ -46,7 +46,43 @@ dotnet test --no-build
 dotnet run --project src/Atomiq.Api
 ```
 
-El endpoint inicial es `GET /health`. Los endpoints de negocio no se crean como placeholders exitosos.
+El endpoint inicial es `GET /health`. Los contratos de Gemini y SignalR no se crean como placeholders exitosos.
+
+## API de perfil y reacciones
+
+Los endpoints de perfil y XP requieren el header `X-Atomiq-Device-Token`. El servidor obtiene el `deviceId` autorizado desde el token y rechaza accesos cruzados entre dispositivos.
+
+```http
+GET /api/profile/device-1
+X-Atomiq-Device-Token: <token-provisionado>
+```
+
+```json
+{
+  "deviceId": "device-1",
+  "currentLevel": 0,
+  "totalXp": 25,
+  "discoveredReactions": []
+}
+```
+
+XP se envía con un `EventId` idempotente:
+
+```http
+POST /api/profile/xp
+Content-Type: application/json
+X-Atomiq-Device-Token: <token-provisionado>
+```
+
+```json
+{
+  "deviceId": "device-1",
+  "eventId": "reaction-event-001",
+  "xpGained": 25
+}
+```
+
+El historial se consulta con `GET /api/reactions/history?page=1&pageSize=20`. El dispositivo se obtiene de la identidad autenticada y no de un parámetro arbitrario.
 
 ## Configuración local
 
@@ -60,6 +96,8 @@ dotnet user-secrets set "Mongo:DatabaseName" "atomiq_local" --project src/Atomiq
 ```
 
 La creación de índices se expone mediante `MongoIndexInitializer` y no se ejecuta automáticamente al iniciar la API.
+
+Los tokens del stand también deben configurarse fuera del repositorio. Nunca deben incrustarse en el APK ni en `appsettings.json`.
 
 ```bash
 dotnet user-secrets init --project src/Atomiq.Api
