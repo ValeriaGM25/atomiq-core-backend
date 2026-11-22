@@ -18,7 +18,8 @@ public sealed record ReactionLogDto(
     string ThermodynamicClassification,
     string? TutorExplanation,
     string? ExplanationSource,
-    DateTimeOffset Timestamp);
+    DateTimeOffset Timestamp,
+    string? ProductDisplayName = null);
 
 public sealed record SaveReactionResult(ReactionLogDto Reaction, bool Inserted, bool DuplicateEvent);
 

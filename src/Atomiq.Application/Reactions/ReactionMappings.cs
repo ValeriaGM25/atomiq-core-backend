@@ -22,6 +22,7 @@ internal static class ReactionMappings
             reaction.ThermodynamicClassification,
             reaction.TutorExplanation,
             reaction.ExplanationSource,
-            reaction.Timestamp);
+            reaction.Timestamp,
+            reaction.ProductDisplayName);
     }
 }

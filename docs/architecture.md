@@ -12,6 +12,14 @@ Domain no conoce frameworks ni otras capas. Application expresa casos de uso y c
 
 La composición actual prepara DI, ProblemDetails, manejo global de excepciones, CORS explícito y los puntos de extensión para SignalR y Gemini. MongoDB se registra de forma diferida: no se conecta ni crea índices hasta que se resuelve un repositorio o se invoca explícitamente el inicializador de índices.
 
+## Tutor Gemini
+
+`ExplainReactionUseCase` coordina el perfil autenticado, `IAiTutorService` y el historial. `AiTutorService` valida estructura y límites, genera una clave completa de caché, consulta `IGeminiClient` solo cuando la política está habilitada y usa fallback local ante indisponibilidad del proveedor.
+
+El cliente Gemini usa `IHttpClientFactory`, timeout configurable y el header `x-goog-api-key`; la clave no se incluye en URLs ni logs. Se manejan timeout, cancelación, 429, 5xx, respuestas vacías, JSON inválido y contenido bloqueado sin interrumpir la experiencia AR: esos casos seleccionan fallback, excepto cancelación explícita del usuario.
+
+La instrucción de sistema pertenece al backend. Los campos de Unity se serializan como datos dentro del prompt y nunca como instrucciones. No se recalculan reacciones ni propiedades químicas.
+
 ## Modelo de datos
 
 `UserProfile` usa un `Id` string neutral al proveedor, `DeviceId` único, XP entero no negativo, reacciones descubiertas sin duplicados y fechas UTC. Los `EventId` de XP aplicados se conservan en el documento para que una repetición no incremente dos veces el total.

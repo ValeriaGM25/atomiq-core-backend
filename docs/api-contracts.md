@@ -13,13 +13,47 @@ Estos contratos son una referencia inicial para la integración con Unity. Todav
 - Evento: `ReceiveTutorExplanation`
 - HTTP: `POST /api/reactions/explain`
 
+El endpoint HTTP está implementado; SignalR sigue sin implementarse.
+
+Payload compatible con Unity:
+
+```json
+{
+  "reactantA": "Na",
+  "reactantB": "Cl",
+  "productFormula": "NaCl",
+  "productDisplayName": "Cloruro de Sodio (Red Cristalina)",
+  "reactionEquation": "Na⁺ + Cl⁻ → NaCl (s)",
+  "isValid": true,
+  "outcomeType": 1,
+  "deltaEnthalpyKjMol": -411.2,
+  "electronsTransferred": 1,
+  "thermodynamicClassification": "Exotérmica",
+  "timestampUnixMs": 1732068000000
+}
+```
+
+Respuesta mínima compatible:
+
+```json
+{
+  "explanation": "Explicación pedagógica.",
+  "source": "OfflineFallback",
+  "historyDuplicate": false
+}
+```
+
+`source` y `historyDuplicate` son extensiones de observabilidad. La entalpía, ecuación y validez son datos declarados por Unity; el ejemplo no afirma que la entalpía corresponda exactamente al proceso visualizado. El backend no implementa un validador químico centralizado.
+
+La explicación se limita a 25 palabras. Gemini recibe una instrucción de sistema controlada por el backend y el payload se marca como dato no confiable; ningún campo textual de Unity puede modificar las instrucciones internas.
+
 ## Perfil y experiencia
 
 - `GET /api/profile/{deviceId}`
 - `POST /api/profile/xp`
 - `GET /api/reactions/history?page=1&pageSize=20`
 
-Los endpoints de perfil, XP e historial están implementados. Los contratos de Gemini y SignalR siguen siendo previstos y no están expuestos.
+Los endpoints de perfil, XP, historial y explicación HTTP están implementados. SignalR sigue siendo un contrato previsto y no está expuesto.
 
 ## Autenticación y autorización
 

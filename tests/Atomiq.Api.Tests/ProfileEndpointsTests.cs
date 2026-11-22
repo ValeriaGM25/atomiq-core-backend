@@ -94,6 +94,61 @@ public sealed class ProfileEndpointsTests : IClassFixture<ApiWebApplicationFacto
         Assert.True(payload.GetProperty("hasNextPage").GetBoolean());
     }
 
+    [Fact]
+    public async Task ExplainReactionAcceptsUnityPayloadAndUsesOfflineFallback()
+    {
+        using var client = CreateClient("test-token-1");
+        var request = new
+        {
+            reactantA = "Na",
+            reactantB = "Cl",
+            productFormula = "NaCl",
+            productDisplayName = "Cloruro de Sodio (Red Cristalina)",
+            reactionEquation = "Na+ + Cl- -> NaCl (s)",
+            isValid = true,
+            outcomeType = 1,
+            deltaEnthalpyKjMol = -411.2,
+            electronsTransferred = 1,
+            thermodynamicClassification = "Exotérmica",
+            timestampUnixMs = 1732068000000L
+        };
+
+        var first = await client.PostAsJsonAsync("/api/reactions/explain", request);
+        var second = await client.PostAsJsonAsync("/api/reactions/explain", request);
+        var firstPayload = await first.Content.ReadFromJsonAsync<JsonElement>();
+        var payload = await second.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+        Assert.Equal("OfflineFallback", firstPayload.GetProperty("source").GetString());
+        Assert.Equal("MemoryCache", payload.GetProperty("source").GetString());
+        Assert.True(payload.GetProperty("historyDuplicate").GetBoolean());
+        Assert.False(string.IsNullOrWhiteSpace(payload.GetProperty("explanation").GetString()));
+    }
+
+    [Fact]
+    public async Task ExplainReactionRejectsInvalidContractValues()
+    {
+        using var client = CreateClient("test-token-1");
+        var response = await client.PostAsJsonAsync("/api/reactions/explain", new
+        {
+            reactantA = "Na",
+            reactantB = "Cl",
+            productFormula = "NaCl",
+            productDisplayName = "Cloruro de Sodio",
+            reactionEquation = "Na+ + Cl- -> NaCl",
+            isValid = true,
+            outcomeType = 99,
+            deltaEnthalpyKjMol = -411.2,
+            electronsTransferred = 1,
+            thermodynamicClassification = "Exotérmica",
+            timestampUnixMs = 1732068000000L
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
     private HttpClient CreateClient(string token)
     {
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions

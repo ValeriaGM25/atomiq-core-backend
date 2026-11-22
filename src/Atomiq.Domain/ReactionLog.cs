@@ -10,6 +10,7 @@ public sealed class ReactionLog
         string reactantA,
         string reactantB,
         string productFormula,
+        string? productDisplayName,
         string reactionEquation,
         double? deltaEnthalpyKjMol,
         int electronsTransferred,
@@ -27,6 +28,7 @@ public sealed class ReactionLog
         ReactantA = FormulaNormalizer.NormalizeRequired(reactantA, nameof(reactantA));
         ReactantB = FormulaNormalizer.NormalizeRequired(reactantB, nameof(reactantB));
         ProductFormula = FormulaNormalizer.NormalizeRequired(productFormula, nameof(productFormula));
+        ProductDisplayName = NormalizeOptional(productDisplayName) ?? ProductFormula;
         ReactionEquation = FormulaNormalizer.NormalizeRequired(reactionEquation, nameof(reactionEquation));
         if (double.IsNaN(deltaEnthalpyKjMol ?? 0) || double.IsInfinity(deltaEnthalpyKjMol ?? 0))
         {
@@ -57,6 +59,7 @@ public sealed class ReactionLog
     public string ReactantA { get; }
     public string ReactantB { get; }
     public string ProductFormula { get; }
+    public string ProductDisplayName { get; }
     public string ReactionEquation { get; }
     public double? DeltaEnthalpyKjMol { get; }
     public int ElectronsTransferred { get; }
@@ -83,7 +86,8 @@ public sealed class ReactionLog
         string? tutorExplanation,
         string? explanationSource,
         DateTimeOffset? timestamp = null,
-        string? id = null)
+        string? id = null,
+        string? productDisplayName = null)
     {
         return new ReactionLog(
             id ?? Guid.NewGuid().ToString("N"),
@@ -93,6 +97,7 @@ public sealed class ReactionLog
             reactantA,
             reactantB,
             productFormula,
+            productDisplayName,
             reactionEquation,
             deltaEnthalpyKjMol,
             electronsTransferred,
@@ -120,7 +125,8 @@ public sealed class ReactionLog
         string thermodynamicClassification,
         string? tutorExplanation,
         string? explanationSource,
-        DateTimeOffset timestamp)
+        DateTimeOffset timestamp,
+        string? productDisplayName = null)
     {
         return new ReactionLog(
             id,
@@ -130,6 +136,7 @@ public sealed class ReactionLog
             reactantA,
             reactantB,
             productFormula,
+            productDisplayName,
             reactionEquation,
             deltaEnthalpyKjMol,
             electronsTransferred,

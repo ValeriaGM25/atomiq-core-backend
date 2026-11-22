@@ -4,6 +4,7 @@ using Atomiq.Api.Contracts;
 using Atomiq.Application.Validation;
 using Atomiq.Application.Profiles;
 using Atomiq.Application.Reactions;
+using Atomiq.Application.Tutor;
 using Atomiq.Infrastructure;
 using Atomiq.Infrastructure.Security;
 using Microsoft.AspNetCore.RateLimiting;
@@ -33,6 +34,7 @@ builder.Services.AddScoped<AddXpUseCase>();
 builder.Services.AddScoped<GetDiscoveredReactionsUseCase>();
 builder.Services.AddScoped<SaveReactionLogUseCase>();
 builder.Services.AddScoped<GetReactionHistoryUseCase>();
+builder.Services.AddScoped<ExplainReactionUseCase>();
 
 var permitLimit = builder.Configuration.GetValue("RateLimiting:PermitLimit", 60);
 var windowSeconds = builder.Configuration.GetValue("RateLimiting:WindowSeconds", 60);
@@ -190,6 +192,33 @@ protectedApi.MapGet("/reactions/history", async (
         result.HasNextPage));
 });
 
+protectedApi.MapPost("/reactions/explain", async (
+    ExplainReactionRequest? request,
+    ClaimsPrincipal user,
+    ExplainReactionUseCase useCase,
+    CancellationToken cancellationToken) =>
+{
+    var validationErrors = ValidateExplanationRequest(request, out var input);
+    if (validationErrors.Count > 0)
+    {
+        return Results.ValidationProblem(validationErrors);
+    }
+
+    var deviceId = user.FindFirstValue(StandTokenAuthenticationHandler.DeviceIdClaim);
+    if (!InputValidation.IsValidDeviceId(deviceId))
+    {
+        return Results.Problem(
+            statusCode: StatusCodes.Status403Forbidden,
+            title: "The authenticated device is not valid.");
+    }
+
+    var result = await useCase.ExecuteAsync(deviceId!, input!, cancellationToken);
+    return Results.Ok(new ExplainReactionResponse(
+        result.Explanation,
+        result.Source,
+        result.HistoryDuplicate));
+});
+
 app.Run();
 
 static bool IsAuthorizedDevice(ClaimsPrincipal user, string deviceId)
@@ -234,6 +263,85 @@ static ProfileResponse ToProfileResponse(Atomiq.Application.Profiles.ProfileDto 
         profile.CurrentLevel,
         profile.TotalXp,
         profile.DiscoveredReactions);
+}
+
+static Dictionary<string, string[]> ValidateExplanationRequest(
+    ExplainReactionRequest? request,
+    out ReactionExplanationInput? input)
+{
+    input = null;
+    var errors = new Dictionary<string, string[]>(StringComparer.Ordinal);
+    if (request is null)
+    {
+        errors["request"] = ["A request body is required."];
+        return errors;
+    }
+
+    AddRequiredTextError(errors, "reactantA", request.ReactantA, 256);
+    AddRequiredTextError(errors, "reactantB", request.ReactantB, 256);
+    AddRequiredTextError(errors, "productFormula", request.ProductFormula, 256);
+    AddRequiredTextError(errors, "productDisplayName", request.ProductDisplayName, 256);
+    AddRequiredTextError(errors, "reactionEquation", request.ReactionEquation, 512);
+    AddRequiredTextError(errors, "thermodynamicClassification", request.ThermodynamicClassification, 256);
+
+    if (!Enum.IsDefined((Atomiq.Domain.ReactionOutcomeType)request.OutcomeType))
+    {
+        errors["outcomeType"] = ["outcomeType is not supported."];
+    }
+
+    if (request.DeltaEnthalpyKjMol is double enthalpy
+        && (double.IsNaN(enthalpy) || double.IsInfinity(enthalpy)))
+    {
+        errors["deltaEnthalpyKjMol"] = ["deltaEnthalpyKjMol must be finite."];
+    }
+
+    if (request.ElectronsTransferred is < 0 or > 10000)
+    {
+        errors["electronsTransferred"] = ["electronsTransferred is outside the supported range."];
+    }
+
+    try
+    {
+        var timestamp = DateTimeOffset.FromUnixTimeMilliseconds(request.TimestampUnixMs);
+        if (timestamp > DateTimeOffset.UtcNow.AddDays(1))
+        {
+            errors["timestampUnixMs"] = ["timestampUnixMs cannot be in the future."];
+        }
+
+        if (errors.Count == 0)
+        {
+            input = new ReactionExplanationInput(
+                request.ReactantA!.Trim(),
+                request.ReactantB!.Trim(),
+                request.ProductFormula!.Trim(),
+                request.ProductDisplayName!.Trim(),
+                request.ReactionEquation!.Trim(),
+                request.IsValid,
+                (Atomiq.Domain.ReactionOutcomeType)request.OutcomeType,
+                request.DeltaEnthalpyKjMol,
+                request.ElectronsTransferred,
+                request.ThermodynamicClassification!.Trim(),
+                timestamp.ToUniversalTime());
+        }
+    }
+    catch (ArgumentOutOfRangeException)
+    {
+        errors["timestampUnixMs"] = ["timestampUnixMs is invalid."];
+    }
+
+    return errors;
+}
+
+static void AddRequiredTextError(
+    IDictionary<string, string[]> errors,
+    string name,
+    string? value,
+    int maxLength)
+{
+    if (string.IsNullOrWhiteSpace(value) || value.Length > maxLength)
+    {
+        errors[name] = [$"{name} is required and must be at most {maxLength} characters."];
+    }
 }
 
 public partial class Program;

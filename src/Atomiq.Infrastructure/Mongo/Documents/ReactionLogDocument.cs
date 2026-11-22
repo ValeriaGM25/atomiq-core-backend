@@ -28,6 +28,10 @@ public sealed class ReactionLogDocument
     [BsonElement("productFormula")]
     public string ProductFormula { get; set; } = null!;
 
+    [BsonElement("productDisplayName")]
+    [BsonIgnoreIfNull]
+    public string? ProductDisplayName { get; set; }
+
     [BsonElement("reactionEquation")]
     public string ReactionEquation { get; set; } = null!;
 

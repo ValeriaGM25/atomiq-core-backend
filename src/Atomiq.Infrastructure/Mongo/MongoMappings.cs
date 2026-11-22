@@ -45,6 +45,7 @@ internal static class MongoMappings
             ReactantA = reaction.ReactantA,
             ReactantB = reaction.ReactantB,
             ProductFormula = reaction.ProductFormula,
+            ProductDisplayName = reaction.ProductDisplayName,
             ReactionEquation = reaction.ReactionEquation,
             DeltaEnthalpyKjMol = reaction.DeltaEnthalpyKjMol,
             ElectronsTransferred = reaction.ElectronsTransferred,
@@ -75,6 +76,7 @@ internal static class MongoMappings
             document.ThermodynamicClassification,
             document.TutorExplanation,
             document.ExplanationSource,
-            document.Timestamp);
+            document.Timestamp,
+            document.ProductDisplayName);
     }
 }

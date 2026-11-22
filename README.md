@@ -8,9 +8,9 @@ Atomiq es un laboratorio inmersivo de dinámica molecular y reacciones químicas
 - C# con nullable reference types y analyzers habilitados
 - Clean Architecture
 - xUnit y `WebApplicationFactory`
-- Puntos de extensión preparados para SignalR, MongoDB y Gemini
+- Gateway configurable para Gemini, MongoDB y puntos de extensión de SignalR
 
-Gemini, SignalR y el motor químico de Unity siguen fuera del alcance de esta fase.
+SignalR y el motor químico de Unity siguen fuera del alcance de esta fase.
 
 ## Requisitos
 
@@ -84,6 +84,14 @@ X-Atomiq-Device-Token: <token-provisionado>
 
 El historial se consulta con `GET /api/reactions/history?page=1&pageSize=20`. El dispositivo se obtiene de la identidad autenticada y no de un parámetro arbitrario.
 
+## Tutor pedagógico
+
+`POST /api/reactions/explain` requiere el mismo token del dispositivo y acepta el payload de simulación Unity. Devuelve siempre una explicación breve en español, junto con `source`, que puede ser `GeminiOnline`, `MemoryCache` u `OfflineFallback`.
+
+Gemini está desactivado por defecto. Cuando está desactivado, no se realiza ninguna llamada externa y se utiliza el fallback local. El backend no recalcula la química ni transforma los datos de Unity en instrucciones para el modelo.
+
+La caché en memoria usa una clave derivada de todos los campos científicos, resultado, idioma, versión del prompt, modelo y política de activación. Su TTL predeterminado es de 24 horas y el tamaño está limitado.
+
 ## Configuración local
 
 La configuración de ejemplo se encuentra en `src/Atomiq.Api/appsettings.json`. Los valores sensibles deben proporcionarse mediante User Secrets o variables de entorno, nunca mediante Git.
@@ -102,7 +110,11 @@ Los tokens del stand también deben configurarse fuera del repositorio. Nunca de
 ```bash
 dotnet user-secrets init --project src/Atomiq.Api
 dotnet user-secrets set "Gemini:ApiKey" "valor-local" --project src/Atomiq.Api
+dotnet user-secrets set "Gemini:Enabled" "true" --project src/Atomiq.Api
+dotnet user-secrets set "Gemini:Model" "gemini-3.5-flash-lite" --project src/Atomiq.Api
 ```
+
+`gemini-3.5-flash-lite` es un candidato configurable sujeto a disponibilidad y compatibilidad de la cuenta; debe verificarse antes de activar el proveedor. `Gemini:BaseUrl`, timeout, límite de palabras, TTL y versión del prompt también son configurables. No se ejecutaron llamadas reales durante esta fase.
 
 ## Contratos Unity
 

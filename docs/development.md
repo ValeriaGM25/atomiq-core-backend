@@ -34,6 +34,21 @@ La API usa HTTPS fuera de Development y Testing. El rate limiting predeterminado
 
 Los errores de validación, autenticación, autorización y rate limiting se expresan con estados HTTP diferenciados. Las excepciones no devuelven trazas ni secretos.
 
+## Gemini y modo sin conexión
+
+Gemini permanece desactivado con `Gemini:Enabled=false`. Para activar una cuenta local, proporcionar la clave mediante User Secrets o una variable de entorno equivalente:
+
+```bash
+dotnet user-secrets set "Gemini:ApiKey" "token-local-no-versionado" --project src/Atomiq.Api
+dotnet user-secrets set "Gemini:Enabled" "true" --project src/Atomiq.Api
+```
+
+La configuración incluye `BaseUrl`, `Model`, `TimeoutMilliseconds`, `MaxOutputWords`, `CacheTtlHours`, `CacheSizeLimit`, `Language` y `PromptVersion`. El candidato `gemini-3.5-flash-lite` no se considera garantizado: debe comprobarse su disponibilidad en la cuenta antes de activar llamadas.
+
+Sin API key o con Gemini desactivado, `POST /api/reactions/explain` usa explicaciones locales para Na/Cl, Na/H2O y un mensaje genérico para resultados no confirmados. No se implementó un fallback específico para H2O porque su reto aún debe confirmarse con Unity.
+
+Las pruebas usan `HttpMessageHandler` simulado y no realizan llamadas reales a Gemini. La experiencia AR local no depende de la disponibilidad del backend o del proveedor.
+
 ## Pruebas
 
 Las pruebas unitarias, de casos de uso y de serialización BSON no requieren MongoDB. La integración real con MongoDB queda pendiente de un contenedor de desarrollo; Docker no está disponible en el entorno actual, por lo que no se ejecutan pruebas contra Atlas ni producción.
