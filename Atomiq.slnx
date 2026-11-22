@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Atomiq.Api/Atomiq.Api.csproj" />
+    <Project Path="src/Atomiq.Application/Atomiq.Application.csproj" />
+    <Project Path="src/Atomiq.Domain/Atomiq.Domain.csproj" />
+    <Project Path="src/Atomiq.Infrastructure/Atomiq.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Atomiq.Api.Tests/Atomiq.Api.Tests.csproj" />
+    <Project Path="tests/Atomiq.Application.Tests/Atomiq.Application.Tests.csproj" />
+    <Project Path="tests/Atomiq.Domain.Tests/Atomiq.Domain.Tests.csproj" />
+  </Folder>
+</Solution>
