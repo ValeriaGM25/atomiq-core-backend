@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
+using Atomiq.Domain;
 
 namespace Atomiq.Infrastructure;
 
@@ -13,10 +14,17 @@ public sealed partial class AtomiqExceptionHandler(ILogger<AtomiqExceptionHandle
     {
         LogUnhandledException(logger, exception, httpContext.Request.Path);
 
-        httpContext.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        var statusCode = exception is DomainException or Atomiq.Application.ApplicationException
+            ? StatusCodes.Status400BadRequest
+            : StatusCodes.Status500InternalServerError;
+        var title = statusCode == StatusCodes.Status400BadRequest
+            ? "The request could not be processed."
+            : "An unexpected error occurred.";
+
+        httpContext.Response.StatusCode = statusCode;
         await Results.Problem(
-            statusCode: StatusCodes.Status500InternalServerError,
-            title: "An unexpected error occurred.",
+            statusCode: statusCode,
+            title: title,
             extensions: new Dictionary<string, object?>
             {
                 ["traceId"] = httpContext.TraceIdentifier

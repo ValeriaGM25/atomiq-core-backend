@@ -8,9 +8,9 @@ Atomiq es un laboratorio inmersivo de dinámica molecular y reacciones químicas
 - C# con nullable reference types y analyzers habilitados
 - Clean Architecture
 - xUnit y `WebApplicationFactory`
-- Puntos de extensión preparados para SignalR, MongoDB y Gemini
+- Gateway configurable para Gemini, MongoDB y puntos de extensión de SignalR
 
-Esta fase no implementa lógica de Gemini, SignalR, MongoDB ni gamificación.
+SignalR y el motor químico de Unity siguen fuera del alcance de esta fase.
 
 ## Requisitos
 
@@ -24,6 +24,8 @@ Esta fase no implementa lógica de Gemini, SignalR, MongoDB ni gamificación.
 - `Atomiq.Application`: casos de uso y puertos de aplicación; depende de Domain.
 - `Atomiq.Infrastructure`: adaptadores técnicos y configuración; depende de Application y Domain.
 - `Atomiq.Api`: composición HTTP, middleware, DI y endpoints; depende de Application e Infrastructure.
+
+El dominio contiene `UserProfile` y `ReactionLog`. Application expone casos de uso para perfiles, XP e historial. MongoDB se mantiene en Infrastructure mediante documentos BSON separados de las entidades.
 
 La validación científica y la simulación química corresponden al cliente Unity Android/ARCore, no a este backend.
 
@@ -44,16 +46,77 @@ dotnet test --no-build
 dotnet run --project src/Atomiq.Api
 ```
 
-El endpoint inicial es `GET /health`. Los endpoints de negocio no se crean como placeholders exitosos.
+El endpoint inicial es `GET /health`. Los contratos de Gemini y SignalR no se crean como placeholders exitosos.
+
+## API de perfil y reacciones
+
+Los endpoints de perfil y XP requieren el header `X-Atomiq-Device-Token`. El servidor obtiene el `deviceId` autorizado desde el token y rechaza accesos cruzados entre dispositivos.
+
+```http
+GET /api/profile/device-1
+X-Atomiq-Device-Token: <token-provisionado>
+```
+
+```json
+{
+  "deviceId": "device-1",
+  "currentLevel": 0,
+  "totalXp": 25,
+  "discoveredReactions": []
+}
+```
+
+XP se envía con un `EventId` idempotente:
+
+```http
+POST /api/profile/xp
+Content-Type: application/json
+X-Atomiq-Device-Token: <token-provisionado>
+```
+
+```json
+{
+  "deviceId": "device-1",
+  "eventId": "reaction-event-001",
+  "xpGained": 25
+}
+```
+
+El historial se consulta con `GET /api/reactions/history?page=1&pageSize=20`. El dispositivo se obtiene de la identidad autenticada y no de un parámetro arbitrario.
+
+El tutor también está disponible en `/hubs/aitutor` mediante SignalR. El contrato y los requisitos del cliente Unity están documentados en [docs/unity-signalr-integration.md](docs/unity-signalr-integration.md). REST permanece disponible como fallback.
+
+## Tutor pedagógico
+
+`POST /api/reactions/explain` requiere el mismo token del dispositivo y acepta el payload de simulación Unity. Devuelve siempre una explicación breve en español, junto con `source`, que puede ser `GeminiOnline`, `MemoryCache` u `OfflineFallback`.
+
+Gemini está desactivado por defecto. Cuando está desactivado, no se realiza ninguna llamada externa y se utiliza el fallback local. El backend no recalcula la química ni transforma los datos de Unity en instrucciones para el modelo.
+
+La caché en memoria usa una clave derivada de todos los campos científicos, resultado, idioma, versión del prompt, modelo y política de activación. Su TTL predeterminado es de 24 horas y el tamaño está limitado.
 
 ## Configuración local
 
 La configuración de ejemplo se encuentra en `src/Atomiq.Api/appsettings.json`. Los valores sensibles deben proporcionarse mediante User Secrets o variables de entorno, nunca mediante Git.
 
+MongoDB utiliza las colecciones `profiles` y `reaction_logs`. La cadena de conexión no se versiona:
+
+```bash
+dotnet user-secrets set "Mongo:ConnectionString" "mongodb://localhost:27017" --project src/Atomiq.Api
+dotnet user-secrets set "Mongo:DatabaseName" "atomiq_local" --project src/Atomiq.Api
+```
+
+La creación de índices se expone mediante `MongoIndexInitializer` y no se ejecuta automáticamente al iniciar la API.
+
+Los tokens del stand también deben configurarse fuera del repositorio. Nunca deben incrustarse en el APK ni en `appsettings.json`.
+
 ```bash
 dotnet user-secrets init --project src/Atomiq.Api
 dotnet user-secrets set "Gemini:ApiKey" "valor-local" --project src/Atomiq.Api
+dotnet user-secrets set "Gemini:Enabled" "true" --project src/Atomiq.Api
+dotnet user-secrets set "Gemini:Model" "gemini-3.5-flash-lite" --project src/Atomiq.Api
 ```
+
+`gemini-3.5-flash-lite` es un candidato configurable sujeto a disponibilidad y compatibilidad de la cuenta; debe verificarse antes de activar el proveedor. `Gemini:BaseUrl`, timeout, límite de palabras, TTL y versión del prompt también son configurables. No se ejecutaron llamadas reales durante esta fase.
 
 ## Contratos Unity
 
