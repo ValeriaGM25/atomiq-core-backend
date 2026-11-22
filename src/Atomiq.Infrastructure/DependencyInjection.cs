@@ -1,8 +1,9 @@
 using Atomiq.Application.Abstractions;
 using Atomiq.Application.Tutor;
 using Atomiq.Infrastructure.Configuration;
-using Atomiq.Infrastructure.Gemini;
+using Atomiq.Infrastructure.Caching;
 using Atomiq.Infrastructure.Mongo;
+using Atomiq.Infrastructure.OpenAi;
 using Atomiq.Infrastructure.Security;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Configuration;
@@ -22,21 +23,21 @@ public static class DependencyInjection
             .Validate(settings => !string.IsNullOrWhiteSpace(settings.DatabaseName),
                 "Mongo:DatabaseName must be configured.")
             .ValidateOnStart();
-        services.AddOptions<GeminiSettings>()
-            .Bind(configuration.GetSection(GeminiSettings.SectionName))
+        services.AddOptions<OpenAiSettings>()
+            .Bind(configuration.GetSection(OpenAiSettings.SectionName))
             .Validate(settings => settings.TimeoutMilliseconds is >= 250 and <= 10000,
-                "Gemini:TimeoutMilliseconds must be between 250 and 10000.")
+                "OpenAI:TimeoutMilliseconds must be between 250 and 10000.")
             .Validate(settings => settings.MaxOutputWords is >= 1 and <= 25,
-                "Gemini:MaxOutputWords must be between 1 and 25.")
+                "OpenAI:MaxOutputWords must be between 1 and 25.")
             .Validate(settings => settings.CacheTtlHours is > 0 and <= 168,
-                "Gemini:CacheTtlHours must be greater than zero and no more than 168.")
+                "OpenAI:CacheTtlHours must be greater than zero and no more than 168.")
             .Validate(settings => settings.CacheSizeLimit is >= 1 and <= 10000,
-                "Gemini:CacheSizeLimit must be between 1 and 10000.")
+                "OpenAI:CacheSizeLimit must be between 1 and 10000.")
             .Validate(settings => !settings.Enabled ||
                 (!string.IsNullOrWhiteSpace(settings.BaseUrl) &&
                  !string.IsNullOrWhiteSpace(settings.Model) &&
                  !string.IsNullOrWhiteSpace(settings.ApiKey)),
-                "Enabled Gemini requires BaseUrl, Model and ApiKey.")
+                "Enabled OpenAI requires BaseUrl, Model and ApiKey.")
             .ValidateOnStart();
         services.AddOptions<StandTokenOptions>()
             .Bind(configuration.GetSection(StandTokenOptions.SectionName));
@@ -48,10 +49,10 @@ public static class DependencyInjection
         services.AddAuthorization();
 
         services.AddMemoryCache(options =>
-            options.SizeLimit = configuration.GetValue("Gemini:CacheSizeLimit", 1024));
+            options.SizeLimit = configuration.GetValue("OpenAI:CacheSizeLimit", 1024));
         services.AddSingleton<TutorConfiguration>(provider =>
         {
-            var settings = provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<GeminiSettings>>().Value;
+            var settings = provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<OpenAiSettings>>().Value;
             return new TutorConfiguration
             {
                 Enabled = settings.Enabled,
@@ -64,9 +65,9 @@ public static class DependencyInjection
             };
         });
         services.AddSingleton<IReactionExplanationCache, MemoryReactionExplanationCache>();
-        services.AddHttpClient<IGeminiClient, GeminiClient>((provider, client) =>
+        services.AddHttpClient<IOpenAiClient, OpenAiClient>((provider, client) =>
         {
-            var settings = provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<GeminiSettings>>().Value;
+            var settings = provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<OpenAiSettings>>().Value;
             client.Timeout = TimeSpan.FromMilliseconds(settings.TimeoutMilliseconds);
         });
         services.AddScoped<IAiTutorService, AiTutorService>();

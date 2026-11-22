@@ -34,20 +34,22 @@ La API usa HTTPS fuera de Development y Testing. El rate limiting predeterminado
 
 Los errores de validación, autenticación, autorización y rate limiting se expresan con estados HTTP diferenciados. Las excepciones no devuelven trazas ni secretos.
 
-## Gemini y modo sin conexión
+## OpenAI y modo sin conexión
 
-Gemini permanece desactivado con `Gemini:Enabled=false`. Para activar una cuenta local, proporcionar la clave mediante User Secrets o una variable de entorno equivalente:
+OpenAI permanece desactivado con `OpenAI:Enabled=false`. Para activar una cuenta local, proporcionar la clave mediante User Secrets o una variable de entorno equivalente. La clave debe haber sido revocada si se expuso anteriormente y nunca debe almacenarse en Git, Unity ni el APK:
 
 ```bash
-dotnet user-secrets set "Gemini:ApiKey" "token-local-no-versionado" --project src/Atomiq.Api
-dotnet user-secrets set "Gemini:Enabled" "true" --project src/Atomiq.Api
+dotnet user-secrets set "OpenAI:ApiKey" "token-local-no-versionado" --project src/Atomiq.Api
+dotnet user-secrets set "OpenAI:Enabled" "true" --project src/Atomiq.Api
 ```
 
-La configuración incluye `BaseUrl`, `Model`, `TimeoutMilliseconds`, `MaxOutputWords`, `CacheTtlHours`, `CacheSizeLimit`, `Language` y `PromptVersion`. El candidato `gemini-3.5-flash-lite` no se considera garantizado: debe comprobarse su disponibilidad en la cuenta antes de activar llamadas.
+La variable de entorno equivalente para la clave es `OpenAI__ApiKey`; no debe aparecer en archivos versionados ni en el APK.
 
-Sin API key o con Gemini desactivado, `POST /api/reactions/explain` usa explicaciones locales para Na/Cl, Na/H2O y un mensaje genérico para resultados no confirmados. No se implementó un fallback específico para H2O porque su reto aún debe confirmarse con Unity.
+La configuración incluye `BaseUrl`, `Model`, `ApiKey`, `TimeoutMilliseconds`, `MaxOutputWords`, `CacheTtlHours`, `CacheSizeLimit`, `Language` y `PromptVersion`. El modelo predeterminado es `gpt-4o` y el cliente usa `POST /v1/responses` con `Authorization: Bearer`.
 
-Las pruebas usan `HttpMessageHandler` simulado y no realizan llamadas reales a Gemini. La experiencia AR local no depende de la disponibilidad del backend o del proveedor.
+Sin API key o con OpenAI desactivado, `POST /api/reactions/explain` usa explicaciones locales para Na/Cl, Na/H2O y un mensaje genérico para resultados no confirmados. Los errores 401, 403, 429, 5xx, timeout, JSON inesperado y respuesta vacía seleccionan fallback; una cancelación explícita se propaga.
+
+Las pruebas usan `HttpMessageHandler` simulado y no realizan llamadas reales a OpenAI. La experiencia AR local no depende de la disponibilidad del backend o del proveedor.
 
 ## SignalR
 

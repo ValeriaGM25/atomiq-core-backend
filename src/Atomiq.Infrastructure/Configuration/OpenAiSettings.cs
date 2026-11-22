@@ -1,11 +1,11 @@
 namespace Atomiq.Infrastructure.Configuration;
 
-public sealed class GeminiSettings
+public sealed class OpenAiSettings
 {
-    public const string SectionName = "Gemini";
+    public const string SectionName = "OpenAI";
 
-    public string BaseUrl { get; init; } = "https://generativelanguage.googleapis.com/";
-    public string Model { get; init; } = "gemini-3.5-flash-lite";
+    public string BaseUrl { get; init; } = "https://api.openai.com/";
+    public string Model { get; init; } = "gpt-4o";
     public string ApiKey { get; init; } = "";
     public int TimeoutMilliseconds { get; init; } = 2500;
     public int MaxOutputWords { get; init; } = 25;

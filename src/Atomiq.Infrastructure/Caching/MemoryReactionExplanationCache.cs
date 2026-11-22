@@ -1,7 +1,7 @@
 using Atomiq.Application.Tutor;
 using Microsoft.Extensions.Caching.Memory;
 
-namespace Atomiq.Infrastructure.Gemini;
+namespace Atomiq.Infrastructure.Caching;
 
 public sealed class MemoryReactionExplanationCache(IMemoryCache cache) : IReactionExplanationCache
 {

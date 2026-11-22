@@ -4,7 +4,7 @@ using System.Text;
 namespace Atomiq.Application.Tutor;
 
 public sealed class AiTutorService(
-    IGeminiClient geminiClient,
+    IOpenAiClient openAiClient,
     IReactionExplanationCache cache,
     TutorConfiguration configuration) : IAiTutorService, IDisposable
 {
@@ -35,14 +35,14 @@ public sealed class AiTutorService(
             TutorExplanation explanation;
             if (configuration.Enabled)
             {
-                GeminiClientResult generated;
+                OpenAiClientResult generated;
                 try
                 {
-                    generated = await geminiClient.GenerateExplanationAsync(input, SystemInstruction, cancellationToken);
+                    generated = await openAiClient.GenerateExplanationAsync(input, SystemInstruction, cancellationToken);
                 }
                 catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
                 {
-                    generated = GeminiClientResult.Unavailable();
+                    generated = OpenAiClientResult.Unavailable();
                 }
                 catch (OperationCanceledException)
                 {
@@ -50,11 +50,11 @@ public sealed class AiTutorService(
                 }
                 catch (Exception)
                 {
-                    generated = GeminiClientResult.Unavailable();
+                    generated = OpenAiClientResult.Unavailable();
                 }
 
                 explanation = generated.Succeeded && TrySanitize(generated.Text, out var sanitized)
-                    ? new TutorExplanation(sanitized, "GeminiOnline")
+                    ? new TutorExplanation(sanitized, "OpenAIOnline")
                     : FallbackTutorService.Explain(input);
             }
             else
@@ -75,6 +75,7 @@ public sealed class AiTutorService(
     {
         var material = string.Join("|", new[]
         {
+            "OpenAI",
             Normalize(input.ReactantA),
             Normalize(input.ReactantB),
             Normalize(input.ProductFormula),

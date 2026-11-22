@@ -46,7 +46,7 @@ Respuesta mínima compatible:
 
 `source`, `historyDuplicate` y `eventId` son extensiones opcionales. La entalpía, ecuación y validez son datos declarados por Unity; el ejemplo no afirma que la entalpía corresponda exactamente al proceso visualizado. El backend no implementa un validador químico centralizado.
 
-La explicación se limita a 25 palabras. Gemini recibe una instrucción de sistema controlada por el backend y el payload se marca como dato no confiable; ningún campo textual de Unity puede modificar las instrucciones internas.
+La explicación se limita a 25 palabras. OpenAI recibe una instrucción controlada por el backend mediante Responses API y el payload se marca como dato no confiable; ningún campo textual de Unity puede modificar las instrucciones internas. Cuando el proveedor está disponible, `source` es `OpenAIOnline`; `MemoryCache` y `OfflineFallback` conservan el contrato público existente.
 
 ## Perfil y experiencia
 
