@@ -63,4 +63,8 @@ public sealed class ReactionLogDocument
     [BsonElement("timestamp")]
     [BsonSerializer(typeof(DateTimeOffsetSerializer))]
     public DateTimeOffset Timestamp { get; set; }
+
+    [BsonElement("unityOutcomeType")]
+    [BsonIgnoreIfNull]
+    public int? UnityOutcomeType { get; set; }
 }

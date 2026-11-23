@@ -86,6 +86,7 @@ public sealed class AiTutorService(
             input.DeltaEnthalpyKjMol?.ToString("R", System.Globalization.CultureInfo.InvariantCulture) ?? "null",
             input.ElectronsTransferred.ToString(System.Globalization.CultureInfo.InvariantCulture),
             Normalize(input.ThermodynamicClassification),
+            input.UnityOutcomeType?.ToString() ?? "null",
             configuration.Language,
             configuration.PromptVersion,
             configuration.Model,

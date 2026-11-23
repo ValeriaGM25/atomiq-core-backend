@@ -30,7 +30,8 @@ public sealed class ArchitectureTests
             IsValid = true,
             OutcomeType = ReactionOutcomeType.Valid,
             ThermodynamicClassification = "Exothermic",
-            Timestamp = DateTimeOffset.UtcNow
+            Timestamp = DateTimeOffset.UtcNow,
+            UnityOutcomeType = 2
         };
 
         var bson = document.ToBsonDocument();
@@ -38,11 +39,39 @@ public sealed class ArchitectureTests
         Assert.Equal("reaction-1", bson["_id"].AsString);
         Assert.Equal("event-1", bson["eventId"].AsString);
         Assert.Equal("Valid", bson["outcomeType"].AsString);
+        Assert.Equal(2, bson["unityOutcomeType"].AsInt32);
         Assert.True(bson.Contains("timestamp"));
 
         var roundTrip = BsonSerializer.Deserialize<ReactionLogDocument>(bson);
         Assert.Equal(
             document.Timestamp.ToUniversalTime().ToUnixTimeMilliseconds(),
             roundTrip.Timestamp.ToUnixTimeMilliseconds());
+        Assert.Equal(2, roundTrip.UnityOutcomeType);
+    }
+
+    [Fact]
+    public void LegacyMongoDocumentWithoutUnityMetadataStillDeserializes()
+    {
+        var legacy = new BsonDocument
+        {
+            ["_id"] = "legacy-reaction",
+            ["eventId"] = "legacy-event",
+            ["deviceId"] = "device-1",
+            ["profileId"] = "profile-1",
+            ["reactantA"] = "Na",
+            ["reactantB"] = "Cl",
+            ["productFormula"] = "NaCl",
+            ["reactionEquation"] = "Na+Cl->NaCl",
+            ["electronsTransferred"] = 1,
+            ["isValid"] = true,
+            ["outcomeType"] = "Valid",
+            ["thermodynamicClassification"] = "Exothermic",
+            ["timestamp"] = new BsonDateTime(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+        };
+
+        var document = BsonSerializer.Deserialize<ReactionLogDocument>(legacy);
+
+        Assert.Equal("legacy-event", document.EventId);
+        Assert.Null(document.UnityOutcomeType);
     }
 }

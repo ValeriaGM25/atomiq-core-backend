@@ -19,7 +19,8 @@ public sealed class ReactionLog
         string thermodynamicClassification,
         string? tutorExplanation,
         string? explanationSource,
-        DateTimeOffset timestamp)
+        DateTimeOffset timestamp,
+        int? unityOutcomeType)
     {
         Id = RequireIdentifier(id, nameof(id));
         EventId = RequireIdentifier(eventId, nameof(eventId));
@@ -50,6 +51,7 @@ public sealed class ReactionLog
         TutorExplanation = NormalizeOptional(tutorExplanation);
         ExplanationSource = NormalizeOptional(explanationSource);
         Timestamp = timestamp.ToUniversalTime();
+        UnityOutcomeType = unityOutcomeType;
     }
 
     public string Id { get; }
@@ -69,6 +71,7 @@ public sealed class ReactionLog
     public string? TutorExplanation { get; }
     public string? ExplanationSource { get; }
     public DateTimeOffset Timestamp { get; }
+    public int? UnityOutcomeType { get; }
 
     public static ReactionLog Create(
         string eventId,
@@ -87,7 +90,8 @@ public sealed class ReactionLog
         string? explanationSource,
         DateTimeOffset? timestamp = null,
         string? id = null,
-        string? productDisplayName = null)
+        string? productDisplayName = null,
+        int? unityOutcomeType = null)
     {
         return new ReactionLog(
             id ?? Guid.NewGuid().ToString("N"),
@@ -106,7 +110,8 @@ public sealed class ReactionLog
             thermodynamicClassification,
             tutorExplanation,
             explanationSource,
-            timestamp ?? DateTimeOffset.UtcNow);
+            timestamp ?? DateTimeOffset.UtcNow,
+            unityOutcomeType);
     }
 
     public static ReactionLog Rehydrate(
@@ -126,7 +131,8 @@ public sealed class ReactionLog
         string? tutorExplanation,
         string? explanationSource,
         DateTimeOffset timestamp,
-        string? productDisplayName = null)
+        string? productDisplayName = null,
+        int? unityOutcomeType = null)
     {
         return new ReactionLog(
             id,
@@ -145,7 +151,8 @@ public sealed class ReactionLog
             thermodynamicClassification,
             tutorExplanation,
             explanationSource,
-            timestamp);
+            timestamp,
+            unityOutcomeType);
     }
 
     private static string RequireIdentifier(string? value, string name)

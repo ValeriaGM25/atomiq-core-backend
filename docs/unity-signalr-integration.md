@@ -49,6 +49,17 @@ El `reactionJson` usa el mismo payload que `POST /api/reactions/explain`. Puede 
 }
 ```
 
+`outcomeType` es un entero del contrato Unity y no un cast directo al enum interno:
+
+```text
+0 None                       -> Unknown
+1 IonicCrystalBond           -> Valid
+2 ExothermicAlkaliExplosion  -> Valid
+3 ElectrostaticRepulsion    -> NoReaction
+```
+
+`isValid` se conserva independientemente del outcome. El backend acepta combinaciones inconsistentes mientras Unity no defina una regla de rechazo, y guarda `unityOutcomeType` como metadata opcional en el historial. Un valor distinto de 0, 1, 2 o 3 se rechaza con un error de payload sanitizado.
+
 Si `eventId` no está presente, el backend conserva la generación determinista histórica como compatibilidad provisional.
 
 ## Autenticación
@@ -66,6 +77,8 @@ El cliente Unity debe confirmar que su implementación permite headers personali
 ## Protocolo y transporte
 
 Se utiliza el protocolo JSON oficial de SignalR. El cliente SignalR gestiona handshake, `invocationId`, separador de registros `0x1E`, ping, cierre y reconexión. La aplicación no construye un protocolo WebSocket propio.
+
+Una invocación JSON completa usa `type: 1`, `invocationId`, `target` y `arguments`. El servidor responde con un mensaje de finalización `type: 3` asociado al mismo `invocationId`; los errores no exponen excepciones ni trazas internas.
 
 El servidor limita el mensaje recibido a 64 KiB y aplica rate limiting por identidad. La duración de la llamada al proveedor OpenAI usa el timeout configurado existente.
 

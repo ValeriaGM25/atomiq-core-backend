@@ -305,7 +305,10 @@ static Dictionary<string, string[]> ValidateExplanationRequest(
     AddRequiredTextError(errors, "reactionEquation", request.ReactionEquation, 512);
     AddRequiredTextError(errors, "thermodynamicClassification", request.ThermodynamicClassification, 256);
 
-    if (!Enum.IsDefined((Atomiq.Domain.ReactionOutcomeType)request.OutcomeType))
+    if (!UnityReactionOutcomeMapper.TryMap(
+            request.OutcomeType,
+            out var unityOutcomeType,
+            out var domainOutcomeType))
     {
         errors["outcomeType"] = ["outcomeType is not supported."];
     }
@@ -338,11 +341,12 @@ static Dictionary<string, string[]> ValidateExplanationRequest(
                 request.ProductDisplayName!.Trim(),
                 request.ReactionEquation!.Trim(),
                 request.IsValid,
-                (Atomiq.Domain.ReactionOutcomeType)request.OutcomeType,
+                domainOutcomeType,
                 request.DeltaEnthalpyKjMol,
                 request.ElectronsTransferred,
                 request.ThermodynamicClassification!.Trim(),
-                timestamp.ToUniversalTime());
+                timestamp.ToUniversalTime(),
+                unityOutcomeType);
         }
     }
     catch (ArgumentOutOfRangeException)

@@ -23,6 +23,7 @@ internal static class ReactionMappings
             reaction.TutorExplanation,
             reaction.ExplanationSource,
             reaction.Timestamp,
-            reaction.ProductDisplayName);
+            reaction.ProductDisplayName,
+            reaction.UnityOutcomeType);
     }
 }

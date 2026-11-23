@@ -13,7 +13,8 @@ public sealed record ReactionExplanationInput(
     double? DeltaEnthalpyKjMol,
     int ElectronsTransferred,
     string ThermodynamicClassification,
-    DateTimeOffset Timestamp);
+    DateTimeOffset Timestamp,
+    UnityReactionOutcomeType? UnityOutcomeType = null);
 
 public sealed record TutorExplanation(string Explanation, string Source);
 

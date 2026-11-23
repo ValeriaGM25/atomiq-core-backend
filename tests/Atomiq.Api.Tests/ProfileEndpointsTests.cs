@@ -149,6 +149,59 @@ public sealed class ProfileEndpointsTests : IClassFixture<ApiWebApplicationFacto
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
     }
 
+    [Theory]
+    [InlineData(0, true, 0)]
+    [InlineData(1, true, 1)]
+    [InlineData(2, false, 1)]
+    [InlineData(3, true, 3)]
+    public async Task ExplainReactionMapsUnityOutcomeWithoutChangingIsValid(
+        int unityOutcomeType,
+        bool isValid,
+        int domainOutcomeType)
+    {
+        using var client = CreateClient("unity-rest-token");
+        var eventId = "unity-rest-outcome-" + unityOutcomeType + "-" + Guid.NewGuid().ToString("N");
+        var response = await client.PostAsJsonAsync("/api/reactions/explain", new
+        {
+            reactantA = "Na",
+            reactantB = "Cl",
+            productFormula = "NaCl",
+            productDisplayName = "Cloruro de Sodio",
+            reactionEquation = "Na+ + Cl- -> NaCl",
+            isValid,
+            outcomeType = unityOutcomeType,
+            deltaEnthalpyKjMol = -411.2,
+            electronsTransferred = 1,
+            thermodynamicClassification = "Exotermica",
+            timestampUnixMs = 1732068000000L,
+            eventId
+        });
+        var responsePayload = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var historyResponse = await client.GetFromJsonAsync<JsonElement>(
+            "/api/reactions/history?page=1&pageSize=100");
+        var historyItem = historyResponse.GetProperty("items")
+            .EnumerateArray()
+            .Single(item => item.GetProperty("eventId").GetString() == eventId);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(responsePayload.GetProperty("source").GetString() is "OfflineFallback" or "MemoryCache");
+        Assert.False(responsePayload.GetProperty("historyDuplicate").GetBoolean());
+        Assert.False(string.IsNullOrWhiteSpace(responsePayload.GetProperty("explanation").GetString()));
+        Assert.Equal(isValid, historyItem.GetProperty("isValid").GetBoolean());
+        Assert.Equal(domainOutcomeType, historyItem.GetProperty("outcomeType").GetInt32());
+        Assert.Equal(unityOutcomeType, historyItem.GetProperty("unityOutcomeType").GetInt32());
+    }
+
+    [Fact]
+    public async Task QueryStringTokenDoesNotAuthenticateApi()
+    {
+        using var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/api/profile/profile-device?access_token=test-token-1");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
     private HttpClient CreateClient(string token)
     {
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions

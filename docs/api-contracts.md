@@ -48,6 +48,29 @@ Respuesta mínima compatible:
 
 La explicación se limita a 25 palabras. OpenAI recibe una instrucción controlada por el backend mediante Responses API y el payload se marca como dato no confiable; ningún campo textual de Unity puede modificar las instrucciones internas. Cuando el proveedor está disponible, `source` es `OpenAIOnline`; `MemoryCache` y `OfflineFallback` conservan el contrato público existente.
 
+### OutcomeType de Unity
+
+`outcomeType` llega como número y usa exclusivamente los valores públicos de Unity:
+
+| Unity | Valor | Dominio persistido |
+| --- | ---: | --- |
+| `None` | 0 | `Unknown` |
+| `IonicCrystalBond` | 1 | `Valid` |
+| `ExothermicAlkaliExplosion` | 2 | `Valid` |
+| `ElectrostaticRepulsion` | 3 | `NoReaction` |
+
+El traductor se aplica en la frontera REST/SignalR. Los valores desconocidos se rechazan; nunca se convierten mediante un cast numérico al enum del dominio. `isValid` es independiente y se conserva exactamente como lo declara Unity. Por ello se aceptan combinaciones potencialmente inconsistentes, como `ExothermicAlkaliExplosion` con `isValid=false` o `ElectrostaticRepulsion` con `isValid=true`, sin recalcular química ni imponer una validación no definida por Unity.
+
+El historial puede incluir `unityOutcomeType` como metadata numérica opcional para conservar el tipo específico original. Los documentos existentes sin ese campo siguen siendo válidos. La respuesta de explicación no cambia:
+
+```json
+{
+  "explanation": "Explicación pedagógica.",
+  "source": "OfflineFallback",
+  "historyDuplicate": false
+}
+```
+
 ## Perfil y experiencia
 
 - `GET /api/profile/{deviceId}`

@@ -54,7 +54,8 @@ internal static class MongoMappings
             ThermodynamicClassification = reaction.ThermodynamicClassification,
             TutorExplanation = reaction.TutorExplanation,
             ExplanationSource = reaction.ExplanationSource,
-            Timestamp = reaction.Timestamp
+            Timestamp = reaction.Timestamp,
+            UnityOutcomeType = reaction.UnityOutcomeType
         };
     }
 
@@ -77,6 +78,7 @@ internal static class MongoMappings
             document.TutorExplanation,
             document.ExplanationSource,
             document.Timestamp,
-            document.ProductDisplayName);
+            document.ProductDisplayName,
+            document.UnityOutcomeType);
     }
 }

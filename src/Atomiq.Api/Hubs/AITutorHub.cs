@@ -41,20 +41,20 @@ public sealed partial class AITutorHub(
             throw new HubException("The reaction payload is invalid.");
         }
 
-        var input = MapRequest(request);
-        var deviceId = Context.User?.FindFirstValue(StandTokenAuthenticationHandler.DeviceIdClaim);
-        if (!InputValidation.IsValidDeviceId(deviceId))
-        {
-            throw new HubException("The authenticated device is invalid.");
-        }
-
-        if (request.EventId is not null && !InputValidation.IsValidEventId(request.EventId))
-        {
-            throw new HubException("The eventId is invalid.");
-        }
-
         try
         {
+            var input = MapRequest(request);
+            var deviceId = Context.User?.FindFirstValue(StandTokenAuthenticationHandler.DeviceIdClaim);
+            if (!InputValidation.IsValidDeviceId(deviceId))
+            {
+                throw new HubException("The authenticated device is invalid.");
+            }
+
+            if (request.EventId is not null && !InputValidation.IsValidEventId(request.EventId))
+            {
+                throw new HubException("The eventId is invalid.");
+            }
+
             var result = await useCase.ExecuteAsync(
                 deviceId!,
                 input,
@@ -85,13 +85,16 @@ public sealed partial class AITutorHub(
 
     private static ReactionExplanationInput MapRequest(ExplainReactionRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.ReactantA)
+        if (!UnityReactionOutcomeMapper.TryMap(
+                request.OutcomeType,
+                out var unityOutcomeType,
+                out var domainOutcomeType)
+            || string.IsNullOrWhiteSpace(request.ReactantA)
             || string.IsNullOrWhiteSpace(request.ReactantB)
             || string.IsNullOrWhiteSpace(request.ProductFormula)
             || string.IsNullOrWhiteSpace(request.ProductDisplayName)
             || string.IsNullOrWhiteSpace(request.ReactionEquation)
             || string.IsNullOrWhiteSpace(request.ThermodynamicClassification)
-            || !Enum.IsDefined((Atomiq.Domain.ReactionOutcomeType)request.OutcomeType)
             || request.ElectronsTransferred is < 0 or > 10000
             || (request.DeltaEnthalpyKjMol is double enthalpy
                 && (double.IsNaN(enthalpy) || double.IsInfinity(enthalpy))))
@@ -121,11 +124,12 @@ public sealed partial class AITutorHub(
             request.ProductDisplayName.Trim(),
             request.ReactionEquation.Trim(),
             request.IsValid,
-            (Atomiq.Domain.ReactionOutcomeType)request.OutcomeType,
+            domainOutcomeType,
             request.DeltaEnthalpyKjMol,
             request.ElectronsTransferred,
             request.ThermodynamicClassification.Trim(),
-            timestamp.ToUniversalTime());
+            timestamp.ToUniversalTime(),
+            unityOutcomeType);
     }
 
     [LoggerMessage(EventId = 20, Level = LogLevel.Warning, Message = "Invalid SignalR reaction payload.")]

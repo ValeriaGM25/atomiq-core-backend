@@ -3,7 +3,6 @@ using System.Net.WebSockets;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
-using Atomiq.Domain;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.SignalR;
@@ -77,6 +76,23 @@ public sealed class SignalRHubTests : IClassFixture<ApiWebApplicationFactory>
     }
 
     [Fact]
+    public async Task UnknownUnityOutcomeIsRejectedWithoutLeakingDetails()
+    {
+        await using var connection = CreateConnection("unity-signalr-token");
+        await connection.StartAsync();
+
+        var exception = await Assert.ThrowsAsync<HubException>(() =>
+            connection.InvokeAsync(
+                "ExplainReaction",
+                JsonSerializer.Serialize(CreatePayload("unknown-signalr-outcome", 99)),
+                "prompt"));
+
+        Assert.DoesNotContain("System.", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("StackTrace", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.NotEmpty(exception.Message);
+    }
+
+    [Fact]
     public async Task AuthorizedConnectionCanReconnect()
     {
         await using var connection = CreateConnection("test-token-2");
@@ -128,6 +144,42 @@ public sealed class SignalRHubTests : IClassFixture<ApiWebApplicationFactory>
         Assert.True(received[1].GetProperty("historyDuplicate").GetBoolean());
     }
 
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(1, 1)]
+    [InlineData(2, 1)]
+    [InlineData(3, 3)]
+    public async Task SignalRMapsUnityOutcomeAndPreservesIsValid(
+        int unityOutcomeType,
+        int domainOutcomeType)
+    {
+        var eventId = "unity-signalr-outcome-" + unityOutcomeType + "-" + Guid.NewGuid().ToString("N");
+        var received = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var connection = CreateConnection("unity-signalr-token");
+        connection.On<string>("ReceiveTutorExplanation", response => received.TrySetResult(response));
+        await connection.StartAsync();
+        await connection.InvokeAsync(
+            "ExplainReaction",
+            JsonSerializer.Serialize(CreatePayload(eventId, unityOutcomeType)),
+            "client prompt");
+
+        var response = JsonSerializer.Deserialize<JsonElement>(
+            await received.Task.WaitAsync(TimeSpan.FromSeconds(5)));
+        using var restClient = factory.CreateClient();
+        restClient.DefaultRequestHeaders.Add("X-Atomiq-Device-Token", "unity-signalr-token");
+        var history = await restClient.GetFromJsonAsync<JsonElement>(
+            "/api/reactions/history?page=1&pageSize=100");
+        var historyItem = history.GetProperty("items")
+            .EnumerateArray()
+            .Single(item => item.GetProperty("eventId").GetString() == eventId);
+
+        Assert.True(response.GetProperty("source").GetString() is "OfflineFallback" or "MemoryCache");
+        Assert.False(response.GetProperty("historyDuplicate").GetBoolean());
+        Assert.True(historyItem.GetProperty("isValid").GetBoolean());
+        Assert.Equal(domainOutcomeType, historyItem.GetProperty("outcomeType").GetInt32());
+        Assert.Equal(unityOutcomeType, historyItem.GetProperty("unityOutcomeType").GetInt32());
+    }
+
     [Fact]
     public async Task WebSocketHandshakeAndInvocationUseSignalRJsonProtocol()
     {
@@ -153,12 +205,21 @@ public sealed class SignalRHubTests : IClassFixture<ApiWebApplicationFactory>
         await SendTextAsync(socket, invocation + "\u001e");
 
         var receivedEvent = false;
-        for (var attempt = 0; attempt < 5 && !receivedEvent; attempt++)
+        var receivedCompletion = false;
+        for (var attempt = 0; attempt < 5 && (!receivedEvent || !receivedCompletion); attempt++)
         {
             var message = await ReceiveTextAsync(socket);
             foreach (var record in message.Split('\u001e', StringSplitOptions.RemoveEmptyEntries))
             {
                 using var document = JsonDocument.Parse(record);
+                if (document.RootElement.TryGetProperty("type", out var messageType)
+                    && messageType.GetInt32() == 3
+                    && document.RootElement.TryGetProperty("invocationId", out var invocationId)
+                    && invocationId.GetString() == "1")
+                {
+                    receivedCompletion = !document.RootElement.TryGetProperty("error", out _);
+                }
+
                 if (document.RootElement.TryGetProperty("target", out var target)
                     && target.GetString() == "ReceiveTutorExplanation")
                 {
@@ -168,6 +229,7 @@ public sealed class SignalRHubTests : IClassFixture<ApiWebApplicationFactory>
         }
 
         Assert.True(receivedEvent);
+        Assert.True(receivedCompletion);
     }
 
     private HubConnection CreateConnection(string? token)
@@ -185,7 +247,7 @@ public sealed class SignalRHubTests : IClassFixture<ApiWebApplicationFactory>
             .Build();
     }
 
-    private static object CreatePayload(string? eventId = null)
+    private static object CreatePayload(string? eventId = null, int outcomeType = 1)
     {
         return new
         {
@@ -197,7 +259,7 @@ public sealed class SignalRHubTests : IClassFixture<ApiWebApplicationFactory>
                 ? "Na+ + Cl- -> NaCl (signalr)"
                 : "Na+ + Cl- -> NaCl (s)",
             isValid = true,
-            outcomeType = (int)ReactionOutcomeType.Valid,
+            outcomeType,
             deltaEnthalpyKjMol = -411.2,
             electronsTransferred = 1,
             thermodynamicClassification = "Exotérmica",

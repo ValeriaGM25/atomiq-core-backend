@@ -30,6 +30,9 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>
                 ["Authentication:DeviceTokens:xp-device"] = "xp-token",
                 ["Authentication:DeviceTokens:history-device"] = "history-token",
                 ["Authentication:DeviceTokens:rate-device"] = "rate-token",
+                ["Authentication:DeviceTokens:contract-device"] = "contract-token",
+                ["Authentication:DeviceTokens:unity-rest-device"] = "unity-rest-token",
+                ["Authentication:DeviceTokens:unity-signalr-device"] = "unity-signalr-token",
                 ["RateLimiting:PermitLimit"] = PermitLimit.ToString(CultureInfo.InvariantCulture),
                 ["RateLimiting:WindowSeconds"] = "60"
             });

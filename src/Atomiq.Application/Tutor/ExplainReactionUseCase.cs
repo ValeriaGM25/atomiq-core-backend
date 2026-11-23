@@ -38,7 +38,10 @@ public sealed class ExplainReactionUseCase(
             explanation.Explanation,
             explanation.Source,
             input.Timestamp,
-            productDisplayName: input.ProductDisplayName);
+            productDisplayName: input.ProductDisplayName,
+            unityOutcomeType: input.UnityOutcomeType is { } unityOutcome
+                ? (int)unityOutcome
+                : null);
         var saved = await history.ExecuteAsync(reaction, cancellationToken);
 
         return new ReactionExplanationResult(

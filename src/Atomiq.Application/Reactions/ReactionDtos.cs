@@ -19,7 +19,8 @@ public sealed record ReactionLogDto(
     string? TutorExplanation,
     string? ExplanationSource,
     DateTimeOffset Timestamp,
-    string? ProductDisplayName = null);
+    string? ProductDisplayName = null,
+    int? UnityOutcomeType = null);
 
 public sealed record SaveReactionResult(ReactionLogDto Reaction, bool Inserted, bool DuplicateEvent);
 
