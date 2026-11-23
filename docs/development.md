@@ -49,8 +49,10 @@ Los errores de validación, autenticación, autorización y rate limiting se exp
 OpenAI permanece desactivado con `OpenAI:Enabled=false`. Para activar una cuenta local, proporcionar la clave mediante User Secrets o una variable de entorno equivalente. La clave debe haber sido revocada si se expuso anteriormente y nunca debe almacenarse en Git, Unity ni el APK:
 
 ```bash
-dotnet user-secrets set "OpenAI:ApiKey" "token-local-no-versionado" --project src/Atomiq.Api
+dotnet user-secrets set "OpenAI:ApiKey" "<API_KEY_PROVISTA_POR_OPERADOR>" --project src/Atomiq.Api
 dotnet user-secrets set "OpenAI:Enabled" "true" --project src/Atomiq.Api
+dotnet user-secrets set "OpenAI:Model" "gpt-4o" --project src/Atomiq.Api
+dotnet user-secrets set "OpenAI:TimeoutMilliseconds" "2500" --project src/Atomiq.Api
 ```
 
 La variable de entorno equivalente para la clave es `OpenAI__ApiKey`; no debe aparecer en archivos versionados ni en el APK.
@@ -59,7 +61,28 @@ La configuración incluye `BaseUrl`, `Model`, `ApiKey`, `TimeoutMilliseconds`, `
 
 Sin API key o con OpenAI desactivado, `POST /api/reactions/explain` usa explicaciones locales para Na/Cl, Na/H2O y un mensaje genérico para resultados no confirmados. Los errores 401, 403, 429, 5xx, timeout, JSON inesperado y respuesta vacía seleccionan fallback; una cancelación explícita se propaga.
 
-Las pruebas usan `HttpMessageHandler` simulado y no realizan llamadas reales a OpenAI. La experiencia AR local no depende de la disponibilidad del backend o del proveedor.
+Las pruebas usan `HttpMessageHandler` simulado y no realizan llamadas reales a OpenAI. La experiencia AR local no depende de la disponibilidad del backend o del proveedor. Para desactivar el proveedor sin detener la experiencia AR, usar `dotnet user-secrets set "OpenAI:Enabled" "false"` o eliminar la clave; el servicio seleccionará `OfflineFallback`.
+
+## Validación live controlada de OpenAI
+
+La herramienta `tools/Atomiq.OpenAi.LiveValidation` está separada de la API y no se incluye en `dotnet test`. Está desactivada si no existe el opt-in exacto `ATOMIQ_ALLOW_OPENAI_LIVE_TEST=I_UNDERSTAND_ONE_PAID_OPENAI_CALL`. Antes de usarla, el operador debe obtener autorización explícita, confirmar que la clave nueva no es la clave revocada y guardarla únicamente en User Secrets de la herramienta:
+
+```bash
+dotnet user-secrets set "OpenAI:ApiKey" "<API_KEY_PROVISTA_POR_OPERADOR>" --project tools/Atomiq.OpenAi.LiveValidation
+dotnet user-secrets set "OpenAI:Enabled" "true" --project tools/Atomiq.OpenAi.LiveValidation
+dotnet user-secrets set "OpenAI:Model" "gpt-4o" --project tools/Atomiq.OpenAi.LiveValidation
+dotnet user-secrets set "OpenAI:TimeoutMilliseconds" "2500" --project tools/Atomiq.OpenAi.LiveValidation
+```
+
+Con autorización, ejecutar como máximo una vez:
+
+```powershell
+$env:ATOMIQ_ALLOW_OPENAI_LIVE_TEST = "I_UNDERSTAND_ONE_PAID_OPENAI_CALL"
+dotnet run --project tools/Atomiq.OpenAi.LiveValidation
+Remove-Item Env:ATOMIQ_ALLOW_OPENAI_LIVE_TEST
+```
+
+La herramienta usa un payload Na/Cl, valida la respuesta de Responses API, limita la explicación a 25 palabras, diferencia `OpenAIOnline` de `OfflineFallback` e informa la latencia. No registra la clave, headers de autorización ni contenido de headers. Una clave inválida, timeout, 401/403, JSON inválido o fallback produce un resultado no aprobado. La prueba puede generar costes y no debe ejecutarse contra producción de la aplicación.
 
 ## SignalR
 

@@ -121,12 +121,31 @@ Los tokens del stand también deben configurarse fuera del repositorio. Nunca de
 
 ```bash
 dotnet user-secrets init --project src/Atomiq.Api
-dotnet user-secrets set "OpenAI:ApiKey" "valor-local-no-versionado" --project src/Atomiq.Api
+dotnet user-secrets set "OpenAI:ApiKey" "<API_KEY_PROVISTA_POR_OPERADOR>" --project src/Atomiq.Api
 dotnet user-secrets set "OpenAI:Enabled" "true" --project src/Atomiq.Api
 dotnet user-secrets set "OpenAI:Model" "gpt-4o" --project src/Atomiq.Api
 ```
 
 `gpt-4o` es el modelo predeterminado y puede cambiarse mediante `OpenAI:Model`. `OpenAI:BaseUrl`, timeout, límite de palabras, TTL y versión del prompt también son configurables. Las pruebas usan HTTP simulado y no ejecutan llamadas reales de pago.
+
+La validación live no se ejecuta con `dotnet test` ni forma parte del arranque de la API. Requiere autorización explícita del operador, una clave vigente almacenada solo en User Secrets del proyecto de herramienta y permite una única solicitud:
+
+```bash
+dotnet user-secrets set "OpenAI:ApiKey" "<API_KEY_PROVISTA_POR_OPERADOR>" --project tools/Atomiq.OpenAi.LiveValidation
+dotnet user-secrets set "OpenAI:Enabled" "true" --project tools/Atomiq.OpenAi.LiveValidation
+dotnet user-secrets set "OpenAI:Model" "gpt-4o" --project tools/Atomiq.OpenAi.LiveValidation
+dotnet user-secrets set "OpenAI:TimeoutMilliseconds" "2500" --project tools/Atomiq.OpenAi.LiveValidation
+```
+
+No se debe pegar una clave en Git, Unity, APK, logs o argumentos compartidos. La prueba manual se autoriza de forma consciente y temporal:
+
+```powershell
+$env:ATOMIQ_ALLOW_OPENAI_LIVE_TEST = "I_UNDERSTAND_ONE_PAID_OPENAI_CALL"
+dotnet run --project tools/Atomiq.OpenAi.LiveValidation
+Remove-Item Env:ATOMIQ_ALLOW_OPENAI_LIVE_TEST
+```
+
+La herramienta imprime únicamente `Source`, latencia, conteo de palabras y explicación; nunca imprime la clave ni headers. `OpenAIOnline` es el único resultado válido de la prueba live. `OfflineFallback`, una respuesta inválida o una clave rechazada terminan con error y no se consideran integración real aprobada. Las llamadas reales pueden generar costes.
 
 ## Contratos Unity
 
