@@ -9,5 +9,6 @@
     <Project Path="tests/Atomiq.Api.Tests/Atomiq.Api.Tests.csproj" />
     <Project Path="tests/Atomiq.Application.Tests/Atomiq.Application.Tests.csproj" />
     <Project Path="tests/Atomiq.Domain.Tests/Atomiq.Domain.Tests.csproj" />
+    <Project Path="tests/Atomiq.Infrastructure.IntegrationTests/Atomiq.Infrastructure.IntegrationTests.csproj" />
   </Folder>
 </Solution>
