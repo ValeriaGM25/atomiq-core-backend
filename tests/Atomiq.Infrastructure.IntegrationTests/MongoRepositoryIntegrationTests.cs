@@ -1,8 +1,10 @@
 using Atomiq.Domain;
 using Atomiq.Application.Abstractions;
 using Atomiq.Infrastructure.Mongo;
+using Atomiq.Infrastructure.Configuration;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using Microsoft.Extensions.Options;
 using System.Globalization;
 
 namespace Atomiq.Infrastructure.IntegrationTests;
@@ -236,15 +238,109 @@ public sealed class MongoRepositoryIntegrationTests(MongoIntegrationFixture fixt
 
         var profileIndexDocuments = await profileIndexes.ToListAsync();
         var reactionIndexDocuments = await reactionIndexes.ToListAsync();
-        var profileIndex = profileIndexDocuments.Single(index => index["name"] == "ux_profiles_deviceId");
-        var eventIndex = reactionIndexDocuments.Single(index => index["name"] == "ux_reaction_logs_eventId");
+        foreach (var expected in MongoIndexInitializer.RequiredIndexes)
+        {
+            var indexes = expected.CollectionName == MongoDbContext.ProfilesCollectionName
+                ? profileIndexDocuments
+                : reactionIndexDocuments;
+            var actual = indexes.Single(index => index["name"] == expected.Name);
 
-        Assert.True(profileIndex["unique"].AsBoolean);
-        Assert.True(eventIndex["unique"].AsBoolean);
-        Assert.Contains(reactionIndexDocuments, index =>
-            index["name"] == "ix_reaction_logs_deviceId_timestamp");
-        Assert.Contains(reactionIndexDocuments, index =>
-            index["name"] == "ix_reaction_logs_reactantA_reactantB");
+            Assert.Equal(expected.Unique, actual.GetValue("unique", false).ToBoolean());
+            Assert.Equal(
+                expected.Fields.Select(field => new { field.Name, field.Direction }),
+                actual["key"].AsBsonDocument.Elements.Select(field => new
+                {
+                    field.Name,
+                    Direction = field.Value.ToInt32()
+                }));
+        }
+    }
+
+    [Fact]
+    public async Task ReadinessDetectsMissingIndexesWithoutCreatingThem()
+    {
+        using var isolated = CreateIsolatedMongo();
+        await isolated.Initializer.EnsureIndexesAsync();
+        await isolated.Context.ReactionLogs.Indexes.DropOneAsync("ux_reaction_logs_eventId");
+
+        using var readiness = new MongoIndexReadiness(isolated.Initializer, TimeProvider.System);
+        var result = await readiness.GetStatusAsync(forceRefresh: true);
+        var indexes = await isolated.Context.ReactionLogs.Indexes.ListAsync();
+        var names = (await indexes.ToListAsync()).Select(index => index["name"].AsString).ToArray();
+
+        Assert.Equal(MongoIndexReadinessStatus.MissingIndexes, result.Status);
+        Assert.Contains("ux_reaction_logs_eventId", result.MissingIndexNames);
+        Assert.DoesNotContain("ux_reaction_logs_eventId", names);
+    }
+
+    [Fact]
+    public async Task IndexInitializationReportsExistingDuplicatesWithoutDeletingThem()
+    {
+        using var isolated = CreateIsolatedMongo();
+        await isolated.Initializer.EnsureIndexesAsync();
+        await isolated.Context.ReactionLogs.Indexes.DropOneAsync("ux_reaction_logs_eventId");
+
+        var profile = UserProfile.Create("duplicate-index-" + Guid.NewGuid().ToString("N"));
+        await isolated.Users.TryCreateAsync(profile);
+        await isolated.Reactions.TryCreateAsync(CreateReaction("duplicate-event", profile, DateTimeOffset.UtcNow));
+        await isolated.Reactions.TryCreateAsync(CreateReaction(
+            "duplicate-event", profile, DateTimeOffset.UtcNow.AddSeconds(1)));
+
+        await Assert.ThrowsAsync<MongoCommandException>(() => isolated.Initializer.EnsureIndexesAsync());
+
+        var documents = await isolated.Context.ReactionLogs
+            .Find(Builders<ReactionLogDocument>.Filter.Eq(document => document.EventId, "duplicate-event"))
+            .ToListAsync();
+        Assert.Equal(2, documents.Count);
+    }
+
+    [Fact]
+    public async Task ReadinessReportsMongoUnavailableWithoutHidingConnectionFailure()
+    {
+        var databaseName = "atomiq_unavailable_" + Guid.NewGuid().ToString("N");
+        var context = new MongoDbContext(Options.Create(new MongoSettings
+        {
+            ConnectionString = "mongodb://127.0.0.1:1/?serverSelectionTimeoutMS=250",
+            DatabaseName = databaseName
+        }));
+        var initializer = new MongoIndexInitializer(context);
+        using var readiness = new MongoIndexReadiness(initializer, TimeProvider.System);
+
+        var result = await readiness.GetStatusAsync(forceRefresh: true);
+
+        Assert.Equal(MongoIndexReadinessStatus.Unavailable, result.Status);
+    }
+
+    private IsolatedMongo CreateIsolatedMongo()
+    {
+        var databaseName = "atomiq_index_test_" + Guid.NewGuid().ToString("N");
+        var client = new MongoClient(fixture.ConnectionString);
+        var context = new MongoDbContext(Options.Create(new MongoSettings
+        {
+            ConnectionString = fixture.ConnectionString,
+            DatabaseName = databaseName
+        }));
+        return new IsolatedMongo(
+            client,
+            context,
+            new MongoIndexInitializer(context),
+            new MongoUserRepository(context),
+            new MongoReactionHistoryRepository(context));
+    }
+
+    private sealed class IsolatedMongo(
+        MongoClient client,
+        MongoDbContext context,
+        MongoIndexInitializer initializer,
+        MongoUserRepository users,
+        MongoReactionHistoryRepository reactions) : IDisposable
+    {
+        public MongoDbContext Context { get; } = context;
+        public MongoIndexInitializer Initializer { get; } = initializer;
+        public MongoUserRepository Users { get; } = users;
+        public MongoReactionHistoryRepository Reactions { get; } = reactions;
+
+        public void Dispose() => client.Dispose();
     }
 
     private async Task<UserProfile> CreateProfileAsync()

@@ -5,6 +5,7 @@ using Atomiq.Api.Contracts;
 using Atomiq.Application.Tutor;
 using Atomiq.Application.Validation;
 using Atomiq.Infrastructure.Security;
+using Atomiq.Infrastructure.Mongo;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 
@@ -13,6 +14,7 @@ namespace Atomiq.Api.Hubs;
 [Authorize]
 public sealed partial class AITutorHub(
     ExplainReactionUseCase useCase,
+    IMongoIndexReadiness readiness,
     ILogger<AITutorHub> logger) : Hub
 {
     private const int MaxReactionJsonBytes = 64 * 1024;
@@ -53,6 +55,13 @@ public sealed partial class AITutorHub(
             if (request.EventId is not null && !InputValidation.IsValidEventId(request.EventId))
             {
                 throw new HubException("The eventId is invalid.");
+            }
+
+            var readinessResult = await readiness.GetStatusAsync(
+                cancellationToken: Context.ConnectionAborted);
+            if (readinessResult.Status != MongoIndexReadinessStatus.Ready)
+            {
+                throw new HubException("Tutor persistence is temporarily unavailable.");
             }
 
             var result = await useCase.ExecuteAsync(

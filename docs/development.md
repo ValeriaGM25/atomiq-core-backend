@@ -18,7 +18,34 @@ dotnet user-secrets set "Mongo:ConnectionString" "mongodb://localhost:27017" --p
 dotnet user-secrets set "Mongo:DatabaseName" "atomiq_local" --project src/Atomiq.Api
 ```
 
-No se ejecuta `MongoIndexInitializer` durante el arranque. Los índices deben crearse mediante un paso operativo explícito y solo sobre la base autorizada.
+No se ejecuta `MongoIndexInitializer` automáticamente durante el arranque. Los índices deben crearse mediante un paso operativo explícito y solo sobre la base autorizada. La API verifica su existencia antes de las escrituras persistentes que dependen de ellos; si faltan, esas operaciones responden `503` y no continúan con una garantía de idempotencia falsa.
+
+### Inicialización y readiness de índices
+
+Con la conexión y base temporal configuradas únicamente para el despliegue
+autorizado, ejecutar el comando explícito:
+
+```powershell
+dotnet run --project src/Atomiq.Api -- --ensure-mongo-indexes
+```
+
+El comando reutiliza `MongoIndexInitializer.EnsureIndexesAsync`, verifica
+inmediatamente el resultado y termina. No se ejecuta desde el arranque normal
+de la API y no debe apuntar a producción sin autorización y permisos explícitos.
+
+`GET /health` solo indica que el proceso está vivo. `GET /health/readiness`
+realiza una verificación de solo lectura de los índices requeridos y devuelve
+`200` únicamente cuando están presentes con nombre, campos, dirección y
+unicidad esperados. La respuesta es `503` para índices ausentes o MongoDB no
+disponible. La verificación se cachea por un intervalo corto y se puede forzar
+solicitando nuevamente el endpoint; el estado no es permanente.
+
+Si la creación del índice único `ux_reaction_logs_eventId` falla porque ya
+existen duplicados, no borrar ni modificar documentos automáticamente. Detener
+la operación, conservar la evidencia, identificar los `eventId` duplicados en
+la base autorizada y aplicar una estrategia de reconciliación aprobada antes
+de reintentar. Mientras falte el índice, las escrituras de perfil y las
+explicaciones REST/SignalR permanecen bloqueadas.
 
 ### Integración MongoDB
 

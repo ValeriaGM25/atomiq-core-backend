@@ -1,6 +1,7 @@
 using System.Globalization;
 using Atomiq.Application.Abstractions;
 using Atomiq.Domain;
+using Atomiq.Infrastructure.Mongo;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -41,8 +42,51 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>
         {
             services.RemoveAll<IUserRepository>();
             services.RemoveAll<IReactionHistoryRepository>();
+            services.RemoveAll<IMongoIndexReadiness>();
             services.AddSingleton<IUserRepository>(Users);
             services.AddSingleton<IReactionHistoryRepository>(Reactions);
+            services.AddSingleton<IMongoIndexReadiness, TestMongoIndexReadiness>();
+        });
+    }
+}
+
+public sealed class TestMongoIndexReadiness : IMongoIndexReadiness
+{
+    public Task<MongoIndexReadinessResult> GetStatusAsync(
+        bool forceRefresh = false,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(MongoIndexReadinessResult.Ready);
+    }
+
+    public void Invalidate()
+    {
+    }
+}
+
+public sealed class MissingMongoIndexReadiness : IMongoIndexReadiness
+{
+    public Task<MongoIndexReadinessResult> GetStatusAsync(
+        bool forceRefresh = false,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(MongoIndexReadinessResult.Missing(["ux_reaction_logs_eventId"]));
+    }
+
+    public void Invalidate()
+    {
+    }
+}
+
+public sealed class NotReadyApiWebApplicationFactory : ApiWebApplicationFactory
+{
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        base.ConfigureWebHost(builder);
+        builder.ConfigureTestServices(services =>
+        {
+            services.RemoveAll<IMongoIndexReadiness>();
+            services.AddSingleton<IMongoIndexReadiness, MissingMongoIndexReadiness>();
         });
     }
 }

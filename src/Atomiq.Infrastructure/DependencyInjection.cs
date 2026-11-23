@@ -75,6 +75,8 @@ public static class DependencyInjection
 
         services.AddSingleton<MongoDbContext>();
         services.AddSingleton<MongoIndexInitializer>();
+        services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<IMongoIndexReadiness, MongoIndexReadiness>();
         services.AddSingleton<IUserRepository, MongoUserRepository>();
         services.AddSingleton<IReactionHistoryRepository, MongoReactionHistoryRepository>();
 

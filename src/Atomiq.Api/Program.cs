@@ -7,6 +7,7 @@ using Atomiq.Application.Profiles;
 using Atomiq.Application.Reactions;
 using Atomiq.Application.Tutor;
 using Atomiq.Infrastructure;
+using Atomiq.Infrastructure.Mongo;
 using Atomiq.Infrastructure.Security;
 using Microsoft.AspNetCore.RateLimiting;
 
@@ -78,6 +79,33 @@ builder.Services.AddRateLimiter(options =>
 
 var app = builder.Build();
 
+if (args.Any(argument => string.Equals(
+        argument,
+        "--ensure-mongo-indexes",
+        StringComparison.OrdinalIgnoreCase)))
+{
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        var initializer = scope.ServiceProvider.GetRequiredService<MongoIndexInitializer>();
+        await initializer.EnsureIndexesAsync();
+        var verification = await initializer.VerifyIndexesAsync();
+        if (verification.Status != MongoIndexReadinessStatus.Ready)
+        {
+            throw new InvalidOperationException("MongoDB indexes could not be verified after initialization.");
+        }
+
+        Console.WriteLine("MongoDB indexes initialized and verified.");
+    }
+    catch (Exception exception)
+    {
+        Console.Error.WriteLine($"MongoDB index initialization failed: {exception.GetType().Name}: {exception.Message}");
+        Environment.ExitCode = 1;
+    }
+
+    return;
+}
+
 if (!app.Environment.IsDevelopment() && !app.Environment.IsEnvironment("Testing"))
 {
     app.UseHttpsRedirection();
@@ -95,6 +123,18 @@ app.MapGet("/health", () => Results.Ok(new
     timestampUtc = DateTimeOffset.UtcNow
 }));
 
+app.MapGet("/health/readiness", async (
+    IMongoIndexReadiness readiness,
+    CancellationToken cancellationToken) =>
+{
+    var result = await readiness.GetStatusAsync(forceRefresh: true, cancellationToken);
+    return result.Status == MongoIndexReadinessStatus.Ready
+        ? Results.Ok(new { status = "ready" })
+        : Results.Problem(
+            statusCode: StatusCodes.Status503ServiceUnavailable,
+            title: "The service is not ready for persistent operations.");
+});
+
 app.MapHub<AITutorHub>("/hubs/aitutor")
     .RequireAuthorization()
     .RequireRateLimiting("mobile-api");
@@ -107,6 +147,7 @@ protectedApi.MapGet("/profile/{deviceId}", async (
     string deviceId,
     ClaimsPrincipal user,
     GetOrCreateProfileUseCase useCase,
+    IMongoIndexReadiness readiness,
     CancellationToken cancellationToken) =>
 {
     if (!InputValidation.IsValidDeviceId(deviceId))
@@ -124,6 +165,12 @@ protectedApi.MapGet("/profile/{deviceId}", async (
             title: "The authenticated device cannot access this resource.");
     }
 
+    var readinessProblem = await RequireMongoReadinessAsync(readiness, cancellationToken);
+    if (readinessProblem is not null)
+    {
+        return readinessProblem;
+    }
+
     var profile = await useCase.ExecuteAsync(deviceId, cancellationToken: cancellationToken);
     return Results.Ok(ToProfileResponse(profile));
 });
@@ -132,6 +179,7 @@ protectedApi.MapPost("/profile/xp", async (
     AddXpRequest? request,
     ClaimsPrincipal user,
     AddXpUseCase useCase,
+    IMongoIndexReadiness readiness,
     CancellationToken cancellationToken) =>
 {
     var errors = ValidateXpRequest(request);
@@ -145,6 +193,12 @@ protectedApi.MapPost("/profile/xp", async (
         return Results.Problem(
             statusCode: StatusCodes.Status403Forbidden,
             title: "The authenticated device cannot access this resource.");
+    }
+
+    var readinessProblem = await RequireMongoReadinessAsync(readiness, cancellationToken);
+    if (readinessProblem is not null)
+    {
+        return readinessProblem;
     }
 
     var result = await useCase.ExecuteAsync(
@@ -205,6 +259,7 @@ protectedApi.MapPost("/reactions/explain", async (
     ExplainReactionRequest? request,
     ClaimsPrincipal user,
     ExplainReactionUseCase useCase,
+    IMongoIndexReadiness readiness,
     CancellationToken cancellationToken) =>
 {
     var validationErrors = ValidateExplanationRequest(request, out var input);
@@ -219,6 +274,12 @@ protectedApi.MapPost("/reactions/explain", async (
         return Results.Problem(
             statusCode: StatusCodes.Status403Forbidden,
             title: "The authenticated device is not valid.");
+    }
+
+    var readinessProblem = await RequireMongoReadinessAsync(readiness, cancellationToken);
+    if (readinessProblem is not null)
+    {
+        return readinessProblem;
     }
 
     if (request!.EventId is not null && !InputValidation.IsValidEventId(request.EventId))
@@ -248,6 +309,18 @@ static bool IsAuthorizedDevice(ClaimsPrincipal user, string deviceId)
         user.FindFirstValue(StandTokenAuthenticationHandler.DeviceIdClaim),
         deviceId,
         StringComparison.Ordinal);
+}
+
+static async Task<IResult?> RequireMongoReadinessAsync(
+    IMongoIndexReadiness readiness,
+    CancellationToken cancellationToken)
+{
+    var result = await readiness.GetStatusAsync(cancellationToken: cancellationToken);
+    return result.Status == MongoIndexReadinessStatus.Ready
+        ? null
+        : Results.Problem(
+            statusCode: StatusCodes.Status503ServiceUnavailable,
+            title: "Persistent operations are temporarily unavailable.");
 }
 
 static Dictionary<string, string[]> ValidateXpRequest(AddXpRequest? request)
