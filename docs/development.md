@@ -20,6 +20,16 @@ dotnet user-secrets set "Mongo:DatabaseName" "atomiq_local" --project src/Atomiq
 
 No se ejecuta `MongoIndexInitializer` durante el arranque. Los índices deben crearse mediante un paso operativo explícito y solo sobre la base autorizada.
 
+### Integración MongoDB
+
+La suite `Atomiq.Infrastructure.IntegrationTests` ejecuta operaciones reales contra MongoDB. Requiere MongoDB local en `127.0.0.1`, `localhost` o `::1`; no se instala Docker ni MongoDB automáticamente:
+
+```bash
+dotnet test tests/Atomiq.Infrastructure.IntegrationTests/Atomiq.Infrastructure.IntegrationTests.csproj
+```
+
+La conexión predeterminada es `mongodb://127.0.0.1:27017`. Para una instancia local alternativa, usar `ATOMIQ_MONGO_TEST_CONNECTION`. La suite crea `atomiq_integration_<id>` por ejecución, verifica el ping antes de probar, crea los índices explícitamente y elimina únicamente sus documentos al finalizar. No se debe configurar una URI de Atlas, producción o un host remoto. La ausencia de MongoDB produce un fallo de integración, no un resultado PASS ni un fallback simulado.
+
 ## Autenticación local
 
 Configurar tokens únicamente mediante User Secrets o variables de entorno. El formato de configuración usa el identificador de dispositivo como clave:
@@ -59,7 +69,7 @@ Las pruebas incluyen cliente SignalR con Long Polling y una prueba de handshake/
 
 ## Pruebas
 
-Las pruebas unitarias, de casos de uso y de serialización BSON no requieren MongoDB. La integración real con MongoDB queda pendiente de un contenedor de desarrollo; Docker no está disponible en el entorno actual, por lo que no se ejecutan pruebas contra Atlas ni producción.
+Las pruebas de `Atomiq.Domain.Tests`, `Atomiq.Application.Tests` y `Atomiq.Api.Tests` no requieren MongoDB real; las últimas usan `TestServer` y repositorios en memoria. Las pruebas de `Atomiq.Infrastructure.IntegrationTests` sí requieren la instancia local descrita arriba y cubren conexión, perfiles, índices únicos, concurrencia de XP, idempotencia, overflow, historial, paginación, serialización BSON, cancelación y errores de conexión.
 
 ## Ramas
 

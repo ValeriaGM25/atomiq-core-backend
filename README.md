@@ -107,6 +107,16 @@ dotnet user-secrets set "Mongo:DatabaseName" "atomiq_local" --project src/Atomiq
 
 La creación de índices se expone mediante `MongoIndexInitializer` y no se ejecuta automáticamente al iniciar la API.
 
+### Pruebas de integración MongoDB
+
+Las pruebas reales están en `Atomiq.Infrastructure.IntegrationTests` y requieren una instancia MongoDB local escuchando en loopback. No instalan Docker, no usan Atlas y generan una base temporal única por ejecución:
+
+```bash
+dotnet test tests/Atomiq.Infrastructure.IntegrationTests/Atomiq.Infrastructure.IntegrationTests.csproj
+```
+
+Por defecto usan `mongodb://127.0.0.1:27017`. Se puede proporcionar otra conexión local mediante `ATOMIQ_MONGO_TEST_CONNECTION`; la suite rechaza hosts no locales. Solo se limpian los documentos creados en la base temporal de la propia ejecución. Si MongoDB no está disponible, estas pruebas fallan explícitamente y no deben reportarse como aprobadas.
+
 Los tokens del stand también deben configurarse fuera del repositorio. Nunca deben incrustarse en el APK ni en `appsettings.json`.
 
 ```bash

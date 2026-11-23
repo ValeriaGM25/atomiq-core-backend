@@ -39,6 +39,8 @@ Los índices definidos son:
 
 `MongoIndexInitializer.EnsureIndexesAsync` usa creación idempotente y nunca elimina índices ni datos, pero requiere invocación operativa explícita.
 
+Las pruebas reales de persistencia viven en `Atomiq.Infrastructure.IntegrationTests`. Cada ejecución usa una base `atomiq_integration_<id>` en un host loopback, inspecciona los índices creados y limpia únicamente los documentos de esa base. No prueban Atlas ni producción.
+
 ## API y seguridad
 
 La composición HTTP expone perfiles, XP e historial bajo `/api`. Los endpoints requieren autenticación `StandToken`, que resuelve un token configurado externamente a un `device_id`. La API compara esa identidad con cualquier `deviceId` recibido para evitar acceso cruzado.
@@ -50,6 +52,8 @@ Los endpoints no exponen el identificador interno del perfil. La validación HTT
 ## Consistencia e idempotencia
 
 La actualización de XP es atómica dentro del documento de perfil mediante un filtro por `EventId`, límite de `int.MaxValue` y `$inc`/`$addToSet`. El historial usa un índice único sobre `EventId`. La escritura de historial y la actualización de XP son operaciones separadas; sin una transacción MongoDB soportada no se afirma atomicidad entre ambas. Los reintentos son seguros por separado y el riesgo de una caída entre operaciones queda pendiente para una futura estrategia transaccional o de reconciliación.
+
+La suite de integración confirma la atomicidad de las actualizaciones concurrentes de XP y la idempotencia de reintentos con el mismo `EventId`. Un evento nuevo con contenido idéntico sigue siendo un evento distinto. No existe una transacción entre XP e historial: una caída entre ambas escrituras puede dejar una operación parcialmente aplicada y requiere reconciliación o una futura estrategia transaccional.
 
 ## SignalR y Unity
 
