@@ -301,7 +301,82 @@ protectedApi.MapPost("/reactions/explain", async (
         result.HistoryDuplicate));
 });
 
+protectedApi.MapPost("/tutor/chat", async (
+    TutorChatRequest? request,
+    ITutorChatService chatService,
+    CancellationToken cancellationToken) =>
+{
+    var validationErrors = ValidateChatRequest(request, out var input);
+    if (validationErrors.Count > 0)
+    {
+        return Results.ValidationProblem(validationErrors);
+    }
+
+    var reply = await chatService.ReplyAsync(input!, cancellationToken);
+    return Results.Ok(new TutorChatResponse(reply.Reply, reply.Source));
+});
+
 app.Run();
+
+static Dictionary<string, string[]> ValidateChatRequest(TutorChatRequest? request, out TutorChatInput? input)
+{
+    input = null;
+    var errors = new Dictionary<string, string[]>(StringComparer.Ordinal);
+    if (request is null)
+    {
+        errors["request"] = ["A request body is required."];
+        return errors;
+    }
+
+    AddRequiredTextError(errors, "message", request.Message, TutorChatLimits.MaxQuestionLength);
+
+    var history = new List<TutorChatTurn>();
+    var turns = request.History ?? [];
+    if (turns.Length > TutorChatLimits.MaxHistoryTurns)
+    {
+        errors["history"] = [$"history can contain at most {TutorChatLimits.MaxHistoryTurns} messages."];
+    }
+    else
+    {
+        foreach (var turn in turns)
+        {
+            var role = turn?.Role switch
+            {
+                "student" => TutorChatRole.Student,
+                "tutor" => TutorChatRole.Tutor,
+                _ => (TutorChatRole?)null
+            };
+            if (role is null || string.IsNullOrWhiteSpace(turn!.Text) || turn.Text.Length > TutorChatLimits.MaxTurnLength)
+            {
+                errors["history"] = [$"Each history message needs role student or tutor and text of at most {TutorChatLimits.MaxTurnLength} characters."];
+                break;
+            }
+
+            history.Add(new TutorChatTurn(role.Value, turn.Text.Trim()));
+        }
+    }
+
+    if (request.Challenge?.Length > TutorChatLimits.MaxContextLength)
+    {
+        errors["challenge"] = [$"challenge must be at most {TutorChatLimits.MaxContextLength} characters."];
+    }
+
+    if (request.LastReaction?.Length > TutorChatLimits.MaxContextLength)
+    {
+        errors["lastReaction"] = [$"lastReaction must be at most {TutorChatLimits.MaxContextLength} characters."];
+    }
+
+    if (errors.Count == 0)
+    {
+        input = new TutorChatInput(
+            request.Message!.Trim(),
+            history,
+            string.IsNullOrWhiteSpace(request.Challenge) ? null : request.Challenge.Trim(),
+            string.IsNullOrWhiteSpace(request.LastReaction) ? null : request.LastReaction.Trim());
+    }
+
+    return errors;
+}
 
 static bool IsAuthorizedDevice(ClaimsPrincipal user, string deviceId)
 {

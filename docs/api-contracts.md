@@ -71,6 +71,41 @@ El historial puede incluir `unityOutcomeType` como metadata numérica opcional p
 }
 ```
 
+### Chat con el tutor
+
+- HTTP: `POST /api/tutor/chat` (requiere `X-Atomiq-Device-Token` y comparte el rate limit `mobile-api`).
+- Conversación libre de química para el estudiante. No usa MongoDB ni guarda historial en el servidor: el cliente envía los últimos mensajes en cada petición.
+
+```json
+{
+  "message": "¿Por qué el sodio reacciona con el agua?",
+  "history": [
+    { "role": "student", "text": "Hola" },
+    { "role": "tutor", "text": "¡Hola! ¿Qué quieres saber?" }
+  ],
+  "challenge": "Sodio (Na) + agua (H₂O)",
+  "lastReaction": "2Na + 2H₂O → 2NaOH + H₂↑"
+}
+```
+
+| Campo | Regla |
+|---|---|
+| `message` | Obligatorio, máximo 400 caracteres. |
+| `history` | Opcional, máximo 8 mensajes; `role` es `student` o `tutor`; `text` máximo 600 caracteres. |
+| `challenge`, `lastReaction` | Opcionales, máximo 200 caracteres. Contexto del laboratorio AR. |
+
+```json
+{
+  "reply": "El sodio cede su electrón y reacciona con el agua: forma NaOH, libera hidrógeno y mucho calor.",
+  "source": "OpenAIOnline"
+}
+```
+
+- Con OpenAI habilitado responde gpt-4o con instrucciones de tutor (español, máximo 80 palabras, solo química, sin instrucciones para experimentos peligrosos reales). El mensaje, el historial y el contexto se envían como datos no confiables, nunca como instrucciones.
+- Si OpenAI está deshabilitado, falla, excede el tiempo, devuelve marcado (`<`, `>`) o pasa de 90 palabras, responde una base local por palabras clave con `source = "OfflineFallback"`.
+- Las respuestas del chat no se guardan en caché.
+- Errores: `400` con `ValidationProblem` si los campos no cumplen las reglas; `401` sin token válido; `429` al exceder el rate limit.
+
 ## Perfil y experiencia
 
 - `GET /api/profile/{deviceId}`

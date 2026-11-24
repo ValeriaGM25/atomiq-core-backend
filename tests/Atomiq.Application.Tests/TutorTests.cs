@@ -301,6 +301,15 @@ public sealed class TutorTests
                 ? OpenAiClientResult.Unavailable()
                 : OpenAiClientResult.Success(text));
         }
+
+        public Task<OpenAiClientResult> GenerateTextAsync(
+            string systemInstruction,
+            string userInput,
+            int maxOutputTokens,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException("The explanation tests do not use free-text generation.");
+        }
     }
 
     private sealed class FakeExplanationCache : IReactionExplanationCache

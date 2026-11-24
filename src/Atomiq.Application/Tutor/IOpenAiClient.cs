@@ -6,6 +6,13 @@ public interface IOpenAiClient
         ReactionExplanationInput input,
         string systemInstruction,
         CancellationToken cancellationToken = default);
+
+    /// <summary>Free-text generation (used by the tutor chat). <paramref name="userInput"/> is untrusted data.</summary>
+    Task<OpenAiClientResult> GenerateTextAsync(
+        string systemInstruction,
+        string userInput,
+        int maxOutputTokens,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed record OpenAiClientResult(bool Succeeded, string? Text)

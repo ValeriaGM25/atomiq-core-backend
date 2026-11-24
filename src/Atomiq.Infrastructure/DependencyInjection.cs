@@ -71,6 +71,7 @@ public static class DependencyInjection
             client.Timeout = TimeSpan.FromMilliseconds(settings.TimeoutMilliseconds);
         });
         services.AddScoped<IAiTutorService, AiTutorService>();
+        services.AddScoped<ITutorChatService, TutorChatService>();
         services.AddScoped<ExplainReactionUseCase>();
 
         services.AddSingleton<MongoDbContext>();

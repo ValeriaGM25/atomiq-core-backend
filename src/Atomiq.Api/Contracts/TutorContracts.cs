@@ -18,3 +18,14 @@ public sealed record ExplainReactionResponse(
     string Explanation,
     string Source,
     bool HistoryDuplicate);
+
+/// <summary>Previous chat message; <c>Role</c> is "student" or "tutor".</summary>
+public sealed record TutorChatTurnRequest(string? Role, string? Text);
+
+public sealed record TutorChatRequest(
+    string? Message,
+    TutorChatTurnRequest[]? History,
+    string? Challenge,
+    string? LastReaction);
+
+public sealed record TutorChatResponse(string Reply, string Source);
